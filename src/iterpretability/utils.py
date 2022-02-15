@@ -106,10 +106,10 @@ class DgpFunctionWrapper(nn.Module):
 
 
 def attribution_fractions(
-    attribution_true: np.ndarray,
-    attribution_est: np.ndarray,
-    detection_tresh: float = 0,
-    top_idx: Optional[int] = None,
+        attribution_true: np.ndarray,
+        attribution_est: np.ndarray,
+        detection_tresh: float = 0,
+        top_idx: Optional[int] = None,
 ) -> np.ndarray:
     """
     Compute the fraction of attribution_est that is truly important for attribution_true for each example
@@ -139,11 +139,11 @@ def attribution_fractions(
 
 
 def dgp_importance_plot(
-    pred_scores: np.ndarray,
-    prog_scores: np.ndarray,
-    po0_scores: np.ndarray,
-    po1_scores: np.ndarray,
-    explainer_name: str,
+        pred_scores: np.ndarray,
+        prog_scores: np.ndarray,
+        po0_scores: np.ndarray,
+        po1_scores: np.ndarray,
+        explainer_name: str,
 ) -> plt.Figure:
     sns.set_style("white")
     fig, axs = plt.subplots(1, 3, figsize=(25, 5))
@@ -203,12 +203,12 @@ def dgp_importance_plot(
 
 
 def dataframe_line_plot(
-    df: pd.DataFrame,
-    x_axis: str,
-    y_axis: str,
-    explainers: list,
-    learners: list,
-    x_logscale: bool = True,
+        df: pd.DataFrame,
+        x_axis: str,
+        y_axis: str,
+        explainers: list,
+        learners: list,
+        x_logscale: bool = True,
 ) -> plt.Figure:
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -217,7 +217,7 @@ def dataframe_line_plot(
         for explainer_name in explainers:
             sub_df = df.loc[
                 (df["Learner"] == learner_name) & (df["Explainer"] == explainer_name)
-            ]
+                ]
             mask_values = sub_df.loc[:, x_axis].values
             metric_values = sub_df.loc[:, y_axis].values
             ax.plot(
@@ -256,11 +256,11 @@ def dataframe_line_plot(
 
 
 def compute_cate_metrics(
-    cate_true: np.ndarray,
-    y_true: np.ndarray,
-    w_true: np.ndarray,
-    mu0_pred: torch.Tensor,
-    mu1_pred: torch.Tensor,
+        cate_true: np.ndarray,
+        y_true: np.ndarray,
+        w_true: np.ndarray,
+        mu0_pred: torch.Tensor,
+        mu1_pred: torch.Tensor,
 ) -> tuple:
     mu0_pred = mu0_pred.detach().cpu().numpy()
     mu1_pred = mu1_pred.detach().cpu().numpy()
@@ -269,11 +269,11 @@ def compute_cate_metrics(
 
     pehe = np.sqrt(mean_squared_error(cate_true, cate_pred))
 
-    y_pred = w_true.reshape(len(cate_true),) * mu1_pred.reshape(len(cate_true),) + (
-        1
-        - w_true.reshape(
-            len(cate_true),
-        )
+    y_pred = w_true.reshape(len(cate_true), ) * mu1_pred.reshape(len(cate_true), ) + (
+            1
+            - w_true.reshape(
+        len(cate_true),
+    )
     ) * mu0_pred.reshape(
         len(cate_true),
     )
@@ -286,3 +286,22 @@ def compute_cate_metrics(
         )
     )
     return pehe, factual_rmse
+
+
+def attribution_accuracy(target_features: list, feature_attributions: torch.Tensor) -> float:
+    """
+ Computes the fraction of the most important features that are truly important
+ Args:
+     target_features: list of truly important feature indices
+     feature_attributions: feature attribution outputted by a feature importance method
+
+ Returns:
+     Fraction of the most important features that are truly important
+    """
+
+    n_important = len(target_features)  # Number of features that are important
+    largest_attribution_idx = torch.topk(feature_attributions, n_important)[1]  # Features with largest attribution
+    accuracy = 0  # Attribution accuracy
+    for k in range(len(largest_attribution_idx)):
+        accuracy += len(np.intersect1d(largest_attribution_idx[k], target_features))
+    return accuracy / (len(feature_attributions)*n_important)
