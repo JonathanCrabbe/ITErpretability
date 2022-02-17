@@ -36,7 +36,7 @@ def normalize_data(X):
 
 def process_tcga(max_num_genes):
     try:
-        tcga_dataset = pickle.load(open('tcga_fl_dataset.p', 'rb'))
+        tcga_dataset = pickle.load(open('tcga_full_dataset.p', 'rb'))
     except:
         raise FileNotFoundError(
             'Full TCGA dataset needs to be downloaded from: https://drive.google.com/file/d/1NveePKQscxJ-VZacOm9MHEAVvPKOQJW8/view?usp=sharing')
