@@ -18,6 +18,7 @@ abbrev_dict = {
     "shapley_value_sampling": "SVS",
     "integrated_gradients": "IG",
     "kernel_shap": "SHAP",
+    "gradient_shap": "GSHAP",
     "feature_permutation": "FP",
     "feature_ablation": "FA",
     "deeplift": "DL",
@@ -288,7 +289,7 @@ def compute_cate_metrics(
     return pehe, factual_rmse
 
 
-def attribution_accuracy(target_features: list, feature_attributions: torch.Tensor) -> float:
+def attribution_accuracy(target_features: list, feature_attributions: np.ndarray) -> float:
     """
  Computes the fraction of the most important features that are truly important
  Args:
@@ -300,7 +301,7 @@ def attribution_accuracy(target_features: list, feature_attributions: torch.Tens
     """
 
     n_important = len(target_features)  # Number of features that are important
-    largest_attribution_idx = torch.topk(feature_attributions, n_important)[1]  # Features with largest attribution
+    largest_attribution_idx = torch.topk(torch.from_numpy(feature_attributions), n_important)[1] # Features with largest attribution
     accuracy = 0  # Attribution accuracy
     for k in range(len(largest_attribution_idx)):
         accuracy += len(np.intersect1d(largest_attribution_idx[k], target_features))

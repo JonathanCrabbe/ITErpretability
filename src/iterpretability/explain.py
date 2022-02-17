@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,9 +12,11 @@ from captum.attr import (
     KernelShap,
     Lime,
     ShapleyValueSampling,
+    GradientShap
 )
 from captum.attr._core.lime import get_exp_kernel_similarity_function
 from torch import nn
+
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,26 +32,24 @@ class Explainer:
         feature_names: List,
         explainer_list: List = [
             "feature_ablation",
+            "feature_permutation",
             "integrated_gradients",
             "deeplift",
-            "feature_permutation",
-            "lime",
             "shapley_value_sampling",
-            "kernel_shap",
+            "lime",
         ],
         n_steps: int = 500,
         perturbations_per_eval: int = 10,
         n_samples: int = 1000,
         kernel_width: float = 1.0,
+        baseline: Optional[torch.Tensor] = None
     ) -> None:
+        self.baseline = baseline
+        self.explainer_list = explainer_list
+        self.feature_names = feature_names
+
         # Feature ablation
         feature_ablation_model = FeatureAblation(model)
-
-        def normalize(X: torch.Tensor) -> torch.Tensor:
-            XX = X.view(X.size(0), -1)
-            XX -= XX.min(1, keepdim=True)[0]
-            XX /= XX.max(1, keepdim=True)[0] + 1e-8
-            return XX.view(X.shape)
 
         def feature_ablation_cbk(X_test: torch.Tensor) -> torch.Tensor:
             out = feature_ablation_model.attribute(
@@ -115,6 +115,12 @@ class Explainer:
                 perturbations_per_eval=perturbations_per_eval,
             )
 
+        # Gradient SHAP
+        gradient_shap_model = GradientShap(model)
+
+        def gradient_shap_cbk(X_test: torch.Tensor) -> torch.Tensor:
+            return gradient_shap_model.attribute(X_test, baselines=self.baseline)
+
         self.explainers = {
             "feature_ablation": feature_ablation_cbk,
             "integrated_gradients": integrated_gradients_cbk,
@@ -123,9 +129,8 @@ class Explainer:
             "lime": lime_cbk,
             "shapley_value_sampling": shapley_value_sampling_cbk,
             "kernel_shap": kernel_shap_cbk,
+            "gradient_shap": gradient_shap_cbk,
         }
-        self.explainer_list = explainer_list
-        self.feature_names = feature_names
 
     def _check_tensor(self, X: torch.Tensor) -> torch.Tensor:
         if isinstance(X, torch.Tensor):
@@ -135,13 +140,14 @@ class Explainer:
 
     def explain(self, X: torch.Tensor) -> Dict:
         output = {}
+        if self.baseline is None:
+            self.baseline = torch.zeros(X.shape)  # Zero tensor as baseline if no baseline specified
         for name in self.explainer_list:
             X_test = self._check_tensor(X)
+            self.baseline = self._check_tensor(self.baseline)
             X_test.requires_grad_()
-
             explainer = self.explainers[name]
             output[name] = explainer(X_test).detach().cpu().numpy()
-
         return output
 
     def plot(self, X: torch.Tensor) -> None:
@@ -155,8 +161,9 @@ class Explainer:
 
             ax = axs[int(idx / 2), idx % 2]
 
-            ax.bar(x_pos, np.mean(explanations[name], axis=0), align="center")
+            ax.bar(x_pos, np.mean(np.abs(explanations[name]), axis=0), align="center")
             ax.set_xlabel("Features")
             ax.set_title(f"{name}")
 
             idx += 1
+        plt.tight_layout()
