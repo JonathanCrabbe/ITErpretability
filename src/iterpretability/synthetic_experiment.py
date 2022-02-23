@@ -56,13 +56,15 @@ class PredictiveSensitivity:
         self,
         dataset: str = "tcga_10",
         num_important_features: int = 2,
+        random_feature_selection: bool = False,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling", "lime"],
     ) -> None:
         log.info(f"Using dataset {dataset} with num_important features = {num_important_features}.")
 
         X_raw_train, X_raw_test = load(dataset, train_ratio=0.8)
-        sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features)
+        sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
+                                       random_feature_selection=random_feature_selection, seed=self.seed)
 
         explainability_data = []
 
@@ -138,13 +140,11 @@ class PredictiveSensitivity:
                 )
                 learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
 
-            all_important_features = reduce(np.union1d, (
-                np.where((sim.prog_mask).astype(np.int32) != 0)[0],
-                np.where((sim.pred0_mask).astype(np.int32) != 0)[0],
-                np.where((sim.pred1_mask).astype(np.int32) != 0)[0]))
+            all_important_features = sim.get_all_important_features()
+            pred_features = sim.get_predictive_features()
+            prog_features = sim.get_prognostic_features()
 
-            pred_features = np.union1d(np.where((sim.pred0_mask).astype(np.int32) != 0)[0],
-                                       np.where((sim.pred1_mask).astype(np.int32) != 0)[0])
+            cate_test = sim.te(X_test)
 
             for explainer_name in explainer_list:
                 for learner_name in learners:
@@ -152,9 +152,14 @@ class PredictiveSensitivity:
                     acc_scores_all_features = attribution_accuracy(
                         all_important_features, attribution_est
                     )
-                    acc_scores_predictive_features = attribution_accuracy(
-                        pred_features, attribution_est
-                    )
+                    acc_scores_predictive_features = attribution_accuracy(pred_features, attribution_est)
+                    acc_scores_prog_features = attribution_accuracy(prog_features, attribution_est)
+                    _, mu0_pred, mu1_pred = learners[learner_name].predict(X=X_test, return_po=True)
+
+                    pehe_test, factual_rmse_test = compute_cate_metrics(cate_true=cate_test, y_true=Y_test,
+                                                                        w_true=W_test,
+                                                                        mu0_pred=mu0_pred, mu1_pred=mu1_pred)
+
                     explainability_data.append(
                         [
                             predictive_scale,
@@ -162,6 +167,12 @@ class PredictiveSensitivity:
                             explainer_name,
                             acc_scores_all_features,
                             acc_scores_predictive_features,
+                            acc_scores_prog_features,
+                            pehe_test,
+                            factual_rmse_test,
+                            np.mean(cate_test),
+                            np.var(cate_test),
+                            pehe_test /  np.sqrt(np.var(cate_test))
                         ]
                     )
 
@@ -171,9 +182,16 @@ class PredictiveSensitivity:
                 "Predictive Scale",
                 "Learner",
                 "Explainer",
-                "All features acc%",
-                "Pred features acc%",
+                "All features ACC",
+                "Pred features ACC",
+                "Prog features ACC",
+                "PEHE",
+                "Factual RMSE",
+                "CATE true mean",
+                "CATE true var",
+                "Normalized PEHE",
             ],
+
         )
 
         results_path = self.save_path / "results/"
@@ -182,4 +200,4 @@ class PredictiveSensitivity:
             results_path.mkdir(parents=True, exist_ok=True)
 
         metrics_df.to_csv(
-            results_path / f"predictive_scale_{dataset}_{num_important_features}_binary_{self.binary_outcome}-seed{self.seed}.csv")
+            results_path / f"predictive_scale_{dataset}_{num_important_features}_random_{random_feature_selection}_binary_{self.binary_outcome}-seed{self.seed}.csv")

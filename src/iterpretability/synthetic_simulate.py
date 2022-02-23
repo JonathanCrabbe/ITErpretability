@@ -1,5 +1,6 @@
 # stdlib
 from typing import Tuple
+from functools import reduce
 
 # third party
 import numpy as np
@@ -7,7 +8,7 @@ import torch
 from scipy.special import expit
 from scipy.stats import zscore
 
-from iterpretability.utils import enable_reproducible_results
+from src.iterpretability.utils import enable_reproducible_results
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -45,7 +46,6 @@ class SyntheticSimulatorBase:
 
         self.prog_mask, self.pred0_mask, self.pred1_mask = None, None, None
         self.prog_weights, self.pred0_weights, self.pred1_weights = None, None, None
-
 
     def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
         raise NotImplementedError
@@ -180,19 +180,19 @@ class SyntheticSimulatorBase:
 
         return X, W_synth, Y_synth, po0, po1, propensity
 
-    def po0(self, X: torch.Tensor) -> torch.Tensor:
+    def po0(self, X: np.ndarray) -> np.ndarray:
         prog_factor, pred0_factor, _ = self.predict(X)
 
         po0 = self.scale_factor * (
-                prog_factor + self.predictive_scale * pred0_factor)
+            prog_factor + self.predictive_scale * pred0_factor)
         return po0
 
-    def po1(self, X: torch.Tensor) -> torch.Tensor:
+    def po1(self, X: np.ndarray) -> np.ndarray:
         prog_factor, _, pred1_factor = self.predict(X)
         po1 = self.scale_factor * (prog_factor + self.predictive_scale * pred1_factor)
         return po1
 
-    def te(self, X: torch.Tensor) -> torch.Tensor:
+    def te(self, X: np.ndarray) -> np.ndarray:
 
         _, pred0_factor, pred1_factor = self.predict(X)
 
@@ -200,11 +200,28 @@ class SyntheticSimulatorBase:
 
         return te
 
-    def prog(self, X: torch.Tensor) -> torch.Tensor:
+    def prog(self, X: np.ndarray) -> np.ndarray:
         prog_factor, _, _ = self.predict(X)
 
         return self.scale_factor * prog_factor
 
+    def get_all_important_features(self) -> np.ndarray:
+        all_important_features = reduce(np.union1d, (
+            np.where((self.prog_mask).astype(np.int32) != 0)[0],
+            np.where((self.pred0_mask).astype(np.int32) != 0)[0],
+            np.where((self.pred1_mask).astype(np.int32) != 0)[0]))
+
+        return all_important_features
+
+    def get_predictive_features(self) -> np.ndarray:
+        pred_features = np.union1d(np.where((self.pred0_mask).astype(np.int32) != 0)[0],
+                                   np.where((self.pred1_mask).astype(np.int32) != 0)[0])
+
+        return pred_features
+
+    def get_prognostic_features(self) -> np.ndarray:
+        prog_features = np.where((self.prog_mask).astype(np.int32) != 0)
+        return prog_features
 
 
 class SyntheticSimulatorLinear(SyntheticSimulatorBase):
@@ -232,24 +249,41 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         self,
         X: np.ndarray,
         num_important_features: int = 10,
+        random_feature_selection: bool = False,
         seed: int = 42,
     ) -> None:
         super(SyntheticSimulatorLinear, self).__init__(seed=seed)
 
-        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features,
+                                                                                       random_feature_selection)
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
         self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
         self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
 
-
-    def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
+    def get_important_features(self, X: np.ndarray, num_important_features: int,
+                               random_feature_selection: bool = False) -> Tuple:
+        assert num_important_features <= int(X.shape[0] / 3)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
 
-        prog_mask[:num_important_features] = 1
-        pred0_mask[num_important_features:(2 * num_important_features)] = 1
-        pred1_mask[(2 * num_important_features):(3 * num_important_features)] = 1
+        if random_feature_selection:
+            all_indices = np.array(range(X.shape[1]))
+            prog_indices = np.random.choice(all_indices, num_important_features, replace=False)
+
+            pred0_indices = np.random.choice(np.setdiff1d(all_indices, prog_indices), num_important_features,
+                                             replace=False)
+            pred1_indices = np.random.choice(reduce(np.setdiff1d, (all_indices, prog_indices, pred0_indices)),
+                                             num_important_features, replace=False)
+
+            prog_mask[prog_indices] = 1
+            pred0_mask[pred0_indices] = 1
+            pred1_mask[pred1_indices] = 1
+        else:
+
+            prog_mask[:num_important_features] = 1
+            pred0_mask[num_important_features:(2 * num_important_features)] = 1
+            pred1_mask[(2 * num_important_features):(3 * num_important_features)] = 1
 
         return prog_mask, pred0_mask, pred1_mask
 
@@ -259,4 +293,3 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         pred1 = np.dot(X, self.pred1_weights)
 
         return prog, pred0, pred1
-

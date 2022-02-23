@@ -9,9 +9,10 @@ from src.iterpretability.synthetic_experiment import PredictiveSensitivity
 def init_arg() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment_name", default="predictive_sensitivity", type=str)
-    parser.add_argument("--dataset", default="tcga_100", type=str)
-    parser.add_argument("--num_important_features", default=10, type=int)
-    parser.add_argument("--binary_outcome", default=True, type=bool)
+    parser.add_argument("--dataset", default="tcga_10", type=str)
+    parser.add_argument("--num_important_features", default=2, type=int)
+    parser.add_argument("--random_feature_selection", default=True, type=bool)
+    parser.add_argument("--binary_outcome", default=False, type=bool)
 
     # Arguments for Propensity Sensitivity Experiment
     parser.add_argument("--treatment_assgn", default="top_pred", type=str)
@@ -20,7 +21,7 @@ def init_arg() -> Any:
     )
     parser.add_argument("--predictive_scale", default=1.0, type=float)
     parser.add_argument(
-        "--seed_list", nargs="+", default=[42, 25], type=int
+        "--seed_list", nargs="+", default=[42, 666, 25, 77, 55], type=int
     )
     parser.add_argument(
         "--explainer_list",
@@ -61,5 +62,6 @@ if __name__ == "__main__":
             exp.run(
                 dataset=args.dataset,
                 num_important_features=args.num_important_features,
+                random_feature_selection=args.random_feature_selection,
                 explainer_list=args.explainer_list,
             )
