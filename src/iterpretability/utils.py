@@ -306,3 +306,35 @@ def attribution_accuracy(target_features: list, feature_attributions: np.ndarray
     for k in range(len(largest_attribution_idx)):
         accuracy += len(np.intersect1d(largest_attribution_idx[k], target_features))
     return accuracy / (len(feature_attributions)*n_important)
+
+
+def get_correlated_features(X: np.ndarray, n_top: int = 10, most_correlated: bool = True,
+                            return_couples: bool = True) -> np.ndarray or tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Computes the most/least correlated features in the array X
+    Args:
+        X: data array of shape (N_samples, N_features)
+        n_top: the number of most/least correlated features to report by decreasing/increasing order of correlation
+        most_correlated: if True, returns the most correlated features. Otherwise, returns the least correlated
+        return_couples: if True, the method returns the features that are the most and least correlated with the ones
+                     the shortlist
+
+    Returns: list of the most/least correlated features and optionally arrays containing
+             the features that are the most and least correlated with the ones the shortlist
+    """
+    if n_top > X.shape[1]:
+        raise ValueError("n_top should be less or equal to the number of features")
+    R = torch.from_numpy(np.corrcoef(X, rowvar=False))  # Correlation matrix
+    R = R - torch.eye(R.shape[0])  # Ignore self-correlation
+    featurewise_correlation = torch.sum(R, dim=1)  # Per feature overall correlation
+    features_shortlist = torch.topk(featurewise_correlation, k=n_top, largest=most_correlated)[1].numpy()
+    if return_couples:
+        most_correlated_couples = np.zeros((n_top, n_top), dtype=int) # Matrix M[i] = n_top most correlated features with feature_shortlist[i]
+        least_correlated_couples = np.zeros((n_top, n_top), dtype=int) # Matrix M[i] = n_top least correlated features with feature_shortlist[i]
+        for idx, top_feature in enumerate(features_shortlist):
+            top_feature_corr = R[top_feature]
+            most_correlated_couples[idx] = torch.topk(top_feature_corr, k=n_top, largest=True)[1].numpy()
+            least_correlated_couples[idx] = torch.topk(top_feature_corr, k=n_top, largest=False)[1].numpy()
+        return features_shortlist, most_correlated_couples, least_correlated_couples
+    else:
+        return features_shortlist
