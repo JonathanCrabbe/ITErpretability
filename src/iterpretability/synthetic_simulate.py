@@ -263,7 +263,7 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
 
     def get_important_features(self, X: np.ndarray, num_important_features: int,
                                random_feature_selection: bool = False) -> Tuple:
-        assert num_important_features <= int(X.shape[0] / 3)
+        assert num_important_features <= int(X.shape[1] / 3)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
@@ -297,10 +297,6 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
 
 
 class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
-    """
-    Synthetic Simulator with Pairwise Interactions
-    """
-
     def __init__(
         self,
         X: np.ndarray,
@@ -309,21 +305,41 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
         selection_type: str = "random",
         seed: int = 42,
     ) -> None:
+        """
+        Synthetic Simulator with Pairwise Interactions
+        Args:
+            X: Features array
+            num_important_features: Number of features that contribute to EACH outcome (prog, pred0 amd pred1)
+            num_interactions:  Number of features that are interacting in the outcome function
+            selection_type: Type of feature selection applied in the semi-synthetic regime
+            seed: Random seed for reproducibility
+        """
         super(SyntheticSimulatorPairwise, self).__init__(seed=seed)
-        assert selection_type in {"correlation_most", "correlation_least", "random"}
+        assert selection_type in {"random"}
         self.prog_mask, self.pred0_mask, self.pred1_mask,\
-            self.prog_inter_mask, self.pred0_inter_mask, self.pred1_inter_mask = self.get_important_features(X,
-                                                                num_important_features,num_interactions, selection_type)
+        self.prog_inter_mask, self.pred0_inter_mask, self.pred1_inter_mask = \
+            self.get_important_features(X, num_important_features, num_interactions, selection_type)
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
         self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
         self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
         self.prog_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.prog_inter_mask
         self.pred0_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred0_inter_mask
         self.pred1_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred1_inter_mask
+        print(self.prog_mask)
+        print(self.pred0_mask)
+        print(self.pred1_mask)
+        print(self.prog_inter_mask)
+        print(self.pred0_inter_mask)
+        print(self.pred1_inter_mask)
+        print(self.get_prognostic_features())
+        print(self.get_predictive_features())
+        print(self.get_all_important_features())
+        print(self.get_interacting_features())
 
     def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1,
                                selection_type: str = "random") -> Tuple:
-        assert 3*(num_important_features + 2*num_interactions) <= int(X.shape[0])
+        assert 3*num_important_features <= int(X.shape[1]) and 2*num_interactions <= num_important_features
+        num_linear = num_important_features - 2*num_interactions
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
@@ -333,14 +349,14 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
         if selection_type == "random":
             all_indices = np.array(range(X.shape[1]))
             np.random.shuffle(all_indices)
-            prog_indices = all_indices[:num_important_features]
-            pred0_indices = all_indices[num_important_features:2*num_important_features]
-            pred1_indices = all_indices[2*num_important_features:3*num_important_features]
-            prog_inter_indices = all_indices[3*num_important_features:3*num_important_features+2*num_interactions]
-            pred0_inter_indices = all_indices[3*num_important_features+2*num_interactions:
-                                              3*num_important_features+4*num_interactions]
-            pred1_inter_indices = all_indices[3*num_important_features+4*num_interactions:
-                                              3*num_important_features+6*num_interactions]
+            prog_indices = all_indices[:num_linear]
+            pred0_indices = all_indices[num_linear:2*num_linear]
+            pred1_indices = all_indices[2*num_linear:3*num_linear]
+            prog_inter_indices = all_indices[3*num_linear:3*num_linear+2*num_interactions]
+            pred0_inter_indices = all_indices[3*num_linear+2*num_interactions:
+                                              3*num_linear+4*num_interactions]
+            pred1_inter_indices = all_indices[3*num_linear+4*num_interactions:
+                                              3*num_linear+6*num_interactions]
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
         pred1_mask[pred1_indices] = 1
@@ -354,3 +370,25 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
         pred0 = np.dot(X, self.pred0_weights) + np.einsum('be,ef,bf->b', X, self.pred0_inter_weights, X)
         pred1 = np.dot(X, self.pred1_weights) + np.einsum('be,ef,bf->b', X, self.pred1_inter_weights, X)
         return prog, pred0, pred1
+
+    def get_all_important_features(self) -> np.ndarray:
+        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
+        return all_important_features
+
+    def get_predictive_features(self) -> np.ndarray:
+        pred_features = np.union1d(np.where((self.pred0_mask + self.pred1_mask).astype(np.int32) != 0)[0],
+                                   np.argwhere((self.pred0_inter_mask + self.pred1_inter_mask).astype(np.int32) != 0).flatten())
+
+        return pred_features
+
+    def get_prognostic_features(self) -> np.ndarray:
+        prog_features = np.union1d(np.where(self.prog_mask.astype(np.int32) != 0)[0],
+                                   np.argwhere((self.prog_inter_mask).astype(np.int32) != 0).flatten())
+        return prog_features
+
+    def get_interacting_features(self) -> np.ndarray:
+        inter_features = np.argwhere((self.pred0_inter_mask +
+                                      self.pred1_inter_mask +
+                                      self.prog_inter_mask
+                                       ).astype(np.int32) != 0).flatten()
+        return inter_features

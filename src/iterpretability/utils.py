@@ -324,7 +324,7 @@ def get_correlated_features(X: np.ndarray, n_top: int = 10, most_correlated: boo
     """
     if n_top > X.shape[1]:
         raise ValueError("n_top should be less or equal to the number of features")
-    R = torch.from_numpy(np.corrcoef(X, rowvar=False))  # Correlation matrix
+    R = torch.from_numpy(np.abs(np.corrcoef(X, rowvar=False)))  # Correlation matrix
     R = R - torch.eye(R.shape[0])  # Ignore self-correlation
     featurewise_correlation = torch.sum(R, dim=1)  # Per feature overall correlation
     features_shortlist = torch.topk(featurewise_correlation, k=n_top, largest=most_correlated)[1].numpy()
