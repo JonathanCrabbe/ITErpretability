@@ -325,16 +325,6 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
         self.prog_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.prog_inter_mask
         self.pred0_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred0_inter_mask
         self.pred1_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred1_inter_mask
-        print(self.prog_mask)
-        print(self.pred0_mask)
-        print(self.pred1_mask)
-        print(self.prog_inter_mask)
-        print(self.pred0_inter_mask)
-        print(self.pred1_inter_mask)
-        print(self.get_prognostic_features())
-        print(self.get_predictive_features())
-        print(self.get_all_important_features())
-        print(self.get_interacting_features())
 
     def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1,
                                selection_type: str = "random") -> Tuple:
