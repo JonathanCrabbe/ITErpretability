@@ -214,12 +214,15 @@ class PredictiveSensitivity:
 
         )
 
-        results_path = self.save_path / "results/"
+        results_path = self.save_path / "results/predictive_sensitivity"
         log.info(f"Saving results in {results_path}...")
         if not results_path.exists():
             results_path.mkdir(parents=True, exist_ok=True)
 
-        metrics_df.to_csv(results_path / f"predictive_scale_{dataset}_{num_important_features}_{self.synthetic_simulator_type}_random_{random_feature_selection}_binary_{binary_outcome}-seed{self.seed}.csv")
+        metrics_df.to_csv(results_path / f"predictive_scale_{dataset}_{num_important_features}_"
+                                         f"{self.synthetic_simulator_type}_random_{random_feature_selection}_"
+                                         f"binary_{binary_outcome}-seed{self.seed}.csv")
+
 
 class PairwiseInteractionSensitivity:
     """
@@ -238,7 +241,6 @@ class PairwiseInteractionSensitivity:
         save_path: Path = Path.cwd(),
         interaction_proportions: list = [0.0, 0.1, 0.5, 1.0],
         predictive_scale: float = 1e-2,
-        binary_outcome: bool = False,
     ) -> None:
 
         self.n_units_hidden = n_units_hidden
@@ -250,7 +252,6 @@ class PairwiseInteractionSensitivity:
         self.explainer_limit = explainer_limit
         self.save_path = save_path
         self.interaction_proportions = interaction_proportions
-        self.binary_outcome = binary_outcome
         self.predictive_scale = predictive_scale
 
     def run(
@@ -259,21 +260,23 @@ class PairwiseInteractionSensitivity:
         num_important_features: int = 15,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling", "lime"],
+        train_ratio: float = 0.8,
+        binary_outcome: bool = False
     ) -> None:
         log.info(f"Using dataset {dataset} with num_important features = {num_important_features}.")
-        X_raw_train, X_raw_test = load(dataset, train_ratio=0.8)
+        X_raw_train, X_raw_test = load(dataset, train_ratio=train_ratio)
         explainability_data = []
 
         for interaction_proportion in self.interaction_proportions:
             num_interactions = int(interaction_proportion*num_important_features/2)
             log.info(f"Now working with {num_interactions} ({100*interaction_proportion}%) of interactions...")
-            sim = SyntheticSimulatorPairwise(X_raw_train, num_important_features=num_important_features,
+            sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
                                              num_interactions=num_interactions, seed=self.seed)
             X_train, W_train, Y_train, po0_train, po1_train, propensity_train =\
-                sim.simulate_dataset(X_raw_train, predictive_scale=self.predictive_scale, binary_outcome=self.binary_outcome)
+                sim.simulate_dataset(X_raw_train, predictive_scale=self.predictive_scale, binary_outcome=binary_outcome)
             X_test, W_test, Y_test, po0_test, po1_test, _ = sim.simulate_dataset(X_raw_test,
                                                                                  predictive_scale=self.predictive_scale,
-                                                                                 binary_outcome=self.binary_outcome)
+                                                                                 binary_outcome=binary_outcome)
 
             log.info("Fitting and explaining learners...")
             learners = {
@@ -393,7 +396,7 @@ class PairwiseInteractionSensitivity:
 
         )
 
-        results_path = self.save_path / "results/pairwise_interaction/"
+        results_path = self.save_path / "results/interaction_sensitivity/"
         log.info(f"Saving results in {results_path}...")
         if not results_path.exists():
             results_path.mkdir(parents=True, exist_ok=True)

@@ -105,13 +105,20 @@ if __name__ == "__main__":
         elif args.experiment_name == "interaction_sensitivity":
             exp = PairwiseInteractionSensitivity(
                 seed=seed,
-                explainer_limit=args.explainer_limit,
-                binary_outcome=args.binary_outcome
+                explainer_limit=args.explainer_limit
             )
-            exp.run(
-                dataset=args.dataset,
-                num_important_features=args.num_important_features,
-                explainer_list=args.explainer_list
-            )
+            for experiment_id in range(len(args.dataset_list)):
+                log.info(
+                    f"Running experiment for {args.dataset_list[experiment_id]}, "
+                    f"{args.num_important_features_list[experiment_id]} important features "
+                    f"with binary outcome {args.binary_outcome_list[experiment_id]}")
+
+                exp.run(
+                    dataset=args.dataset_list[experiment_id],
+                    train_ratio=args.train_ratio,
+                    num_important_features=args.num_important_features_list[experiment_id],
+                    binary_outcome=args.binary_outcome_list[experiment_id],
+                    explainer_list=args.explainer_list,
+                )
         else:
             raise ValueError("The experiment name is invalid.")
