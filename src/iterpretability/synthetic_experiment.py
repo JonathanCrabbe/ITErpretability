@@ -14,7 +14,7 @@ from sklearn.metrics import mean_squared_error
 import src.iterpretability.logger as log
 from src.iterpretability.explain import Explainer
 from src.iterpretability.datasets.data_loader import load
-from src.iterpretability.synthetic_simulate import SyntheticSimulatorLinear
+from src.iterpretability.synthetic_simulate import SyntheticSimulatorLinear, SyntheticSimulatorLinearCorrelations, SyntheticSimulatorLinearPairwise
 from src.iterpretability.utils import (
     attribution_accuracy,
     compute_cate_metrics,
@@ -35,10 +35,11 @@ class PredictiveSensitivity:
         batch_size: int = 1024,
         n_iter: int = 1000,
         seed: int = 42,
-        explainer_limit: int = 100,
+        explainer_limit: int = 500,
         save_path: Path = Path.cwd(),
-        predictive_scales: list = [1e-3, 1e-2, 1e-1, 1, 10, 100],
-        binary_outcome: bool = False,
+        predictive_scales: list = [1e-3, 1e-2, 1e-1, 1, 2, 5, 10],
+        num_interactions: int = 1,
+        synthetic_simulator_type: str = 'linear',
     ) -> None:
 
         self.n_units_hidden = n_units_hidden
@@ -50,21 +51,40 @@ class PredictiveSensitivity:
         self.explainer_limit = explainer_limit
         self.save_path = save_path
         self.predictive_scales = predictive_scales
-        self.binary_outcome = binary_outcome
+        self.num_interactions = num_interactions
+        self.synthetic_simulator_type = synthetic_simulator_type
 
     def run(
         self,
         dataset: str = "tcga_10",
+        train_ratio: float = 0.8,
         num_important_features: int = 2,
+        binary_outcome: bool = False,
         random_feature_selection: bool = False,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling", "lime"],
     ) -> None:
         log.info(f"Using dataset {dataset} with num_important features = {num_important_features}.")
 
-        X_raw_train, X_raw_test = load(dataset, train_ratio=0.8)
-        sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
-                                       random_feature_selection=random_feature_selection, seed=self.seed)
+        X_raw_train, X_raw_test = load(dataset, train_ratio=train_ratio)
+
+        if self.synthetic_simulator_type == 'linear':
+            sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
+                                           random_feature_selection=random_feature_selection, seed=self.seed)
+
+        elif self.synthetic_simulator_type == 'linear_least_correlated':
+            sim = SyntheticSimulatorLinearCorrelations(X_raw_train, num_important_features=num_important_features,
+                                                       correlation_type='least_correlated', seed=self.seed)
+
+        elif self.synthetic_simulator_type == 'linear_most_correlated':
+            sim = SyntheticSimulatorLinearCorrelations(X_raw_train, num_important_features=num_important_features,
+                                                       correlation_type='most_correlated', seed=self.seed)
+
+        elif self.synthetic_simulator_type == 'linear_pairwise_interactions':
+            sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
+                                                   num_interactions = self.num_interactions, seed=self.seed)
+        else:
+            raise Exception('Unknown simulator type.')
 
         explainability_data = []
 
@@ -72,11 +92,11 @@ class PredictiveSensitivity:
             log.info(f"Now working with predictive_scale = {predictive_scale}...")
             X_train, W_train, Y_train, po0_train, po1_train, propensity_train = sim.simulate_dataset(X_raw_train,
                                                                                                      predictive_scale=predictive_scale,
-                                                                                                     binary_outcome=self.binary_outcome)
+                                                                                                     binary_outcome=binary_outcome)
 
             X_test, W_test, Y_test, po0_test, po1_test, _ = sim.simulate_dataset(X_raw_test,
                                                                                  predictive_scale=predictive_scale,
-                                                                                 binary_outcome=self.binary_outcome)
+                                                                                 binary_outcome=binary_outcome)
 
             log.info("Fitting and explaining learners...")
             learners = {
@@ -172,7 +192,7 @@ class PredictiveSensitivity:
                             factual_rmse_test,
                             np.mean(cate_test),
                             np.var(cate_test),
-                            pehe_test /  np.sqrt(np.var(cate_test))
+                            pehe_test / np.sqrt(np.var(cate_test))
                         ]
                     )
 
@@ -200,4 +220,4 @@ class PredictiveSensitivity:
             results_path.mkdir(parents=True, exist_ok=True)
 
         metrics_df.to_csv(
-            results_path / f"predictive_scale_{dataset}_{num_important_features}_random_{random_feature_selection}_binary_{self.binary_outcome}-seed{self.seed}.csv")
+            results_path / f"predictive_scale_{dataset}_{num_important_features}_{self.synthetic_simulator_type}_random_{random_feature_selection}_binary_{binary_outcome}-seed{self.seed}.csv")
