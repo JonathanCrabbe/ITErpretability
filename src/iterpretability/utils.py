@@ -210,6 +210,8 @@ def dataframe_line_plot(
         explainers: list,
         learners: list,
         x_logscale: bool = True,
+        aggregate: bool = False,
+        aggregate_type: str = 'mean'
 ) -> plt.Figure:
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -219,11 +221,13 @@ def dataframe_line_plot(
             sub_df = df.loc[
                 (df["Learner"] == learner_name) & (df["Explainer"] == explainer_name)
                 ]
-            mask_values = sub_df.loc[:, x_axis].values
-            metric_values = sub_df.loc[:, y_axis].values
+            if aggregate:
+                sub_df = sub_df.groupby(x_axis).agg(aggregate_type).reset_index()
+            x_values = sub_df.loc[:, x_axis].values
+            y_values = sub_df.loc[:, y_axis].values
             ax.plot(
-                mask_values,
-                metric_values,
+                x_values,
+                y_values,
                 color=learner_colors[learner_name],
                 marker=explainer_symbols[explainer_name],
             )
