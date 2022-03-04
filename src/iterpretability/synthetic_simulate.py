@@ -207,11 +207,7 @@ class SyntheticSimulatorBase:
         return self.scale_factor * prog_factor
 
     def get_all_important_features(self) -> np.ndarray:
-        all_important_features = reduce(np.union1d, (
-            np.where((self.prog_mask).astype(np.int32) != 0)[0],
-            np.where((self.pred0_mask).astype(np.int32) != 0)[0],
-            np.where((self.pred1_mask).astype(np.int32) != 0)[0]))
-
+        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
         return all_important_features
 
     def get_predictive_features(self) -> np.ndarray:
@@ -232,10 +228,9 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
     Args:
         X: np.ndarray/pd.DataFrame
             Baseline covariates
+        num_important_features: Number of features that contribute to EACH outcome (prog, pred0 and pred1)
         seed: int
             Random seed
-        predictive_scale: float
-            Parameter to control the magnitude of the predictive effect.
 
     Returns:
         X: the same set of covariates
@@ -250,7 +245,7 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         self,
         X: np.ndarray,
         num_important_features: int = 10,
-        random_feature_selection: bool = False,
+        random_feature_selection: bool = True,
         seed: int = 42,
     ) -> None:
         super(SyntheticSimulatorLinear, self).__init__(seed=seed)
@@ -268,23 +263,17 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
 
+        all_indices = np.array(range(X.shape[1]))
         if random_feature_selection:
-            all_indices = np.array(range(X.shape[1]))
-            prog_indices = np.random.choice(all_indices, num_important_features, replace=False)
+            np.random.shuffle(all_indices)
 
-            pred0_indices = np.random.choice(np.setdiff1d(all_indices, prog_indices), num_important_features,
-                                             replace=False)
-            pred1_indices = np.random.choice(reduce(np.setdiff1d, (all_indices, prog_indices, pred0_indices)),
-                                             num_important_features, replace=False)
+        prog_indices = all_indices[:num_important_features]
+        pred0_indices = all_indices[num_important_features:(2 * num_important_features)]
+        pred1_indices = all_indices[(2 * num_important_features):(3 * num_important_features)]
 
-            prog_mask[prog_indices] = 1
-            pred0_mask[pred0_indices] = 1
-            pred1_mask[pred1_indices] = 1
-        else:
-
-            prog_mask[:num_important_features] = 1
-            pred0_mask[num_important_features:(2 * num_important_features)] = 1
-            pred1_mask[(2 * num_important_features):(3 * num_important_features)] = 1
+        prog_mask[prog_indices] = 1
+        pred0_mask[pred0_indices] = 1
+        pred1_mask[pred1_indices] = 1
 
         return prog_mask, pred0_mask, pred1_mask
 
@@ -296,7 +285,7 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         return prog, pred0, pred1
 
 
-class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
+class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
     def __init__(
         self,
         X: np.ndarray,
@@ -309,12 +298,12 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
         Synthetic Simulator with Pairwise Interactions
         Args:
             X: Features array
-            num_important_features: Number of features that contribute to EACH outcome (prog, pred0 amd pred1)
+            num_important_features: Number of features that contribute to EACH outcome (prog, pred0 and pred1)
             num_interactions:  Number of features that are interacting in the outcome function
             selection_type: Type of feature selection applied in the semi-synthetic regime
             seed: Random seed for reproducibility
         """
-        super(SyntheticSimulatorPairwise, self).__init__(seed=seed)
+        super(SyntheticSimulatorLinearPairwise, self).__init__(seed=seed)
         assert selection_type in {"random"}
         self.prog_mask, self.pred0_mask, self.pred1_mask,\
         self.prog_inter_mask, self.pred0_inter_mask, self.pred1_inter_mask = \
@@ -382,3 +371,98 @@ class SyntheticSimulatorPairwise(SyntheticSimulatorBase):
                                       self.prog_inter_mask
                                        ).astype(np.int32) != 0).flatten()
         return inter_features
+
+
+
+class SyntheticSimulatorLinearCorrelations(SyntheticSimulatorBase):
+    """
+    Data generation process.
+
+    Args:
+        X: np.ndarray/pd.DataFrame
+            Baseline covariates
+        seed: int
+            Random seed
+        predictive_scale: float
+            Parameter to control the magnitude of the predictive effect.
+
+    Returns:
+        X: the same set of covariates
+        W_synth: simulated treatments
+        Y_synth: simulated outcomes
+        prog_out: the prognostic outcome for X
+        po0, po1: potential outcomes for X
+        est: the RandomEstimator used
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        num_important_features: int = 10,
+        correlation_type: str = 'most_correlated',
+        seed: int = 42,
+    ) -> None:
+        super(SyntheticSimulatorLinearCorrelations, self).__init__(seed=seed)
+
+        self.correlation_type = correlation_type
+
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
+        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+
+    def get_important_features(self, X: np.ndarray, num_important_features: int,
+                               random_feature_selection: bool = False) -> Tuple:
+        assert num_important_features <= int(X.shape[1] / 3)
+        prog_mask = np.zeros(shape=(X.shape[1]))
+        pred0_mask = np.zeros(shape=(X.shape[1]))
+        pred1_mask = np.zeros(shape=(X.shape[1]))
+
+        if self.correlation_type == 'least_correlated':
+            self.features_shortlist = get_correlated_features(X, 3 * num_important_features, most_correlated=False, return_couples=False)
+            np.random.shuffle(self.features_shortlist)
+
+            prog_indices = self.features_shortlist[:num_important_features]
+            pred0_indices = self.features_shortlist[num_important_features:(2 * num_important_features)]
+            pred1_indices = self.features_shortlist[(2 * num_important_features):(3 * num_important_features)]
+
+        elif self.correlation_type == 'most_correlated':
+            self.features_shortlist, self.most_correlated_couples, _ = get_correlated_features(X, 2 * num_important_features,
+                                                                                          most_correlated=True, return_couples=True)
+
+            np.random.shuffle(self.features_shortlist)
+            pred0_indices = self.features_shortlist[:num_important_features]
+            pred1_indices = self.features_shortlist[num_important_features:(2 * num_important_features)]
+
+            features_diff_list = []
+            for i in range(2 * num_important_features):
+                features_diff_list.append(np.setdiff1d(self.most_correlated_couples[i], self.features_shortlist))
+
+            most_correlated_selected_features = []
+            for i in range(2 * num_important_features):
+                features_diff_list[i] = np.setdiff1d(features_diff_list[i], most_correlated_selected_features)
+                if (len(features_diff_list[i]) > 0):
+                    most_correlated_selected_features.append(features_diff_list[i][0])
+
+            np.random.shuffle(most_correlated_selected_features)
+            self.num_prognostic_features = np.minimum(num_important_features, len(most_correlated_selected_features))
+            print (self.num_prognostic_features)
+            prog_indices = most_correlated_selected_features[:self.num_prognostic_features]
+        else:
+            raise Exception('Unknown correlation type.')
+
+
+        prog_mask[prog_indices] = 1
+        pred0_mask[pred0_indices] = 1
+        pred1_mask[pred1_indices] = 1
+
+        return prog_mask, pred0_mask, pred1_mask
+
+    def predict(self, X: np.ndarray) -> Tuple:
+        prog = np.dot(X, self.prog_weights)
+        pred0 = np.dot(X, self.pred0_weights)
+        pred1 = np.dot(X, self.pred1_weights)
+
+        return prog, pred0, pred1
+
+
