@@ -403,4 +403,4 @@ class PairwiseInteractionSensitivity:
 
         metrics_df.to_csv(
             results_path /
-            f"{dataset}_{num_important_features}_binary_{self.binary_outcome}-seed{self.seed}.csv")
+            f"{dataset}_{num_important_features}_binary_{binary_outcome}-seed{self.seed}.csv")
