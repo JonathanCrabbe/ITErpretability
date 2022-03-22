@@ -14,7 +14,13 @@ from sklearn.metrics import mean_squared_error
 import src.iterpretability.logger as log
 from src.iterpretability.explain import Explainer
 from src.iterpretability.datasets.data_loader import load
-from src.iterpretability.synthetic_simulate import SyntheticSimulatorLinear, SyntheticSimulatorLinearCorrelations, SyntheticSimulatorLinearPairwise
+from src.iterpretability.synthetic_simulate import (
+    SyntheticSimulatorLinear,
+    SyntheticSimulatorLinearCorrelations,
+    SyntheticSimulatorLinearPairwise,
+    SyntheticSimulatorNonLinear,
+    SyntheticSimulatorNonLinearCorrelations,
+)
 from src.iterpretability.utils import (
     attribution_accuracy,
     compute_cate_metrics,
@@ -83,6 +89,13 @@ class PredictiveSensitivity:
         elif self.synthetic_simulator_type == 'linear_pairwise_interactions':
             sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
                                                    num_interactions = self.num_interactions, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear':
+            sim = SyntheticSimulatorNonLinear(X_raw_train, num_important_features=num_important_features,
+                                           random_feature_selection=random_feature_selection, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear_most_correlated':
+            sim = SyntheticSimulatorNonLinearCorrelations(X_raw_train, num_important_features=num_important_features,
+                                                       correlation_type='most_correlated', seed=self.seed)
+
         else:
             raise Exception('Unknown simulator type.')
 
