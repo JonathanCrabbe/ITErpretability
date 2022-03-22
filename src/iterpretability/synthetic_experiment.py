@@ -240,7 +240,7 @@ class PairwiseInteractionSensitivity:
         explainer_limit: int = 100,
         save_path: Path = Path.cwd(),
         interaction_proportions: list = [0.0, 0.1, 0.5, 1.0],
-        predictive_scale: float = 1e-2,
+        predictive_scale: float = 1,
     ) -> None:
 
         self.n_units_hidden = n_units_hidden

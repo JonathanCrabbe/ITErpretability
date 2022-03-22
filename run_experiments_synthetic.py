@@ -39,10 +39,7 @@ def init_arg() -> Any:
         "--binary_outcome_list",
         nargs="+",
         type=bool,
-        default=[False,
-                 True,
-                 False,
-                 True],
+        default=[False],
     )
 
     # Arguments for Propensity Sensitivity Experiment
@@ -71,7 +68,7 @@ def init_arg() -> Any:
         default=["TARNet", "CFRNet", "SNet", "SNet_noprop", "TLearner", "SLearner"],
     )
     parser.add_argument("--run_name", type=str, default="results")
-    parser.add_argument("--explainer_limit", type=int, default=100)
+    parser.add_argument("--explainer_limit", type=int, default=500)
     parser.add_argument("--n_layers_r", type=int, default=1)
     parser.add_argument("--ortho_reg_type", type=str, default="abs")
     parser.add_argument("--penalty_orthogonal", type=float, default=0.01)
