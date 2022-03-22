@@ -254,6 +254,7 @@ class PairwiseInteractionSensitivity:
         save_path: Path = Path.cwd(),
         interaction_proportions: list = [0.0, 0.1, 0.5, 1.0],
         predictive_scale: float = 1,
+        synthetic_simulator_type: str = "pairwise_random"
     ) -> None:
 
         self.n_units_hidden = n_units_hidden
@@ -266,6 +267,7 @@ class PairwiseInteractionSensitivity:
         self.save_path = save_path
         self.interaction_proportions = interaction_proportions
         self.predictive_scale = predictive_scale
+        self.synthetic_simulator_type = synthetic_simulator_type
 
     def run(
         self,
@@ -284,7 +286,8 @@ class PairwiseInteractionSensitivity:
             num_interactions = int(interaction_proportion*num_important_features/2)
             log.info(f"Now working with {num_interactions} ({100*interaction_proportion}%) of interactions...")
             sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
-                                             num_interactions=num_interactions, seed=self.seed)
+                                                   num_interactions=num_interactions, seed=self.seed,
+                                                   selection_type=self.synthetic_simulator_type)
             X_train, W_train, Y_train, po0_train, po1_train, propensity_train =\
                 sim.simulate_dataset(X_raw_train, predictive_scale=self.predictive_scale, binary_outcome=binary_outcome)
             X_test, W_test, Y_test, po0_test, po1_test, _ = sim.simulate_dataset(X_raw_test,
@@ -409,7 +412,7 @@ class PairwiseInteractionSensitivity:
 
         )
 
-        results_path = self.save_path / "results/interaction_sensitivity/"
+        results_path = self.save_path / f"results/interaction_sensitivity/{self.synthetic_simulator_type}"
         log.info(f"Saving results in {results_path}...")
         if not results_path.exists():
             results_path.mkdir(parents=True, exist_ok=True)

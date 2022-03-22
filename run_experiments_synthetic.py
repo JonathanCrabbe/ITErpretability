@@ -102,7 +102,8 @@ if __name__ == "__main__":
         elif args.experiment_name == "interaction_sensitivity":
             exp = PairwiseInteractionSensitivity(
                 seed=seed,
-                explainer_limit=args.explainer_limit
+                explainer_limit=args.explainer_limit,
+                synthetic_simulator_type=args.synthetic_simulator_type
             )
             for experiment_id in range(len(args.dataset_list)):
                 log.info(

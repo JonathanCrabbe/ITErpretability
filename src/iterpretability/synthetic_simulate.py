@@ -304,10 +304,11 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
             seed: Random seed for reproducibility
         """
         super(SyntheticSimulatorLinearPairwise, self).__init__(seed=seed)
-        assert selection_type in {"random"}
+        assert selection_type in {"pairwise_random", "pairwise_prog_pred"}
+        self.selection_type = selection_type
         self.prog_mask, self.pred0_mask, self.pred1_mask, \
         self.prog_inter_mask, self.pred0_inter_mask, self.pred1_inter_mask = \
-            self.get_important_features(X, num_important_features, num_interactions, selection_type)
+            self.get_important_features(X, num_important_features, num_interactions)
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
         self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
         self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
@@ -315,17 +316,20 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
         self.pred0_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred0_inter_mask
         self.pred1_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred1_inter_mask
 
-    def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1,
-                               selection_type: str = "random") -> Tuple:
-        assert 3 * num_important_features <= int(X.shape[1]) and 2 * num_interactions <= num_important_features
-        num_linear = num_important_features - 2 * num_interactions
+    def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1) -> Tuple:
+        assert 3 * num_important_features <= int(X.shape[1]) and 2*num_interactions <= num_important_features
+        np.random.seed(self.seed)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
         prog_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
         pred0_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
         pred1_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
-        if selection_type == "random":
+        prog_indices, pred0_indices, pred1_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+        prog_inter_indices, pred0_inter_indices, pred1_inter_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+
+        if self.selection_type == "pairwise_random":
+            num_linear = num_important_features - 2 * num_interactions
             all_indices = np.array(range(X.shape[1]))
             np.random.shuffle(all_indices)
             prog_indices = all_indices[:num_linear]
@@ -336,12 +340,23 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
                                               3 * num_linear + 4 * num_interactions]
             pred1_inter_indices = all_indices[3 * num_linear + 4 * num_interactions:
                                               3 * num_linear + 6 * num_interactions]
+            prog_inter_mask[prog_inter_indices[::2], prog_inter_indices[1::2]] = 1
+            pred0_inter_mask[pred0_inter_indices[::2], pred0_inter_indices[1::2]] = 1
+            pred1_inter_mask[pred1_inter_indices[::2], pred1_inter_indices[1::2]] = 1
+        elif self.selection_type == "pairwise_prog_pred":
+            all_indices = np.array(range(X.shape[1]))
+            np.random.shuffle(all_indices)
+            prog_indices = all_indices[:num_important_features]
+            pred0_indices = all_indices[num_important_features:2*num_important_features]
+            pred1_indices = all_indices[2*num_important_features:3*num_important_features]
+            prog_inter_indices = all_indices[3*num_important_features:3*num_important_features+2*num_interactions]
+            prog_inter_mask[prog_inter_indices[::2], pred0_indices[:num_interactions]] = 1
+            prog_inter_mask[prog_inter_indices[1::2], pred1_indices[:num_interactions]] = 1
+
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
         pred1_mask[pred1_indices] = 1
-        prog_inter_mask[prog_inter_indices[::2], prog_inter_indices[1::2]] = 1
-        pred0_inter_mask[pred0_inter_indices[::2], pred0_inter_indices[1::2]] = 1
-        pred1_inter_mask[pred1_inter_indices[::2], pred1_inter_indices[1::2]] = 1
+
         return prog_mask, pred0_mask, pred1_mask, prog_inter_mask, pred0_inter_mask, pred1_inter_mask
 
     def predict(self, X: np.ndarray) -> Tuple:
