@@ -1,4 +1,5 @@
 # stdlib
+import random
 from typing import Tuple
 from functools import reduce
 
@@ -291,7 +292,7 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
         X: np.ndarray,
         num_important_features: int = 10,
         num_interactions: int = 1,
-        selection_type: str = "random",
+        selection_type: str = "pairwise_random",
         seed: int = 42,
     ) -> None:
         """
@@ -580,3 +581,92 @@ class SyntheticSimulatorNonLinearCorrelations(SyntheticSimulatorLinearCorrelatio
         pred1 = np.sin(np.dot(X, self.pred1_weights))
 
         return prog, pred0, pred1
+
+
+class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
+    nonlinearities = [
+        lambda x: np.abs(x),
+        lambda x: np.exp(-(x**2)/2),
+        lambda x: 1/(1+x**2),
+        lambda x: np.cos(x),
+        lambda x: np.arctan(x),
+        lambda x: np.tanh(x),
+        lambda x: np.sigmoid(x),
+        lambda x: np.log(1+x**2),
+        lambda x: np.sqrt(1+x**2),
+        lambda x: np.relu(x)
+    ]
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        non_linearity_scale: float,
+        num_important_features: int = 10,
+        selection_type: str = "random",
+        seed: int = 42,
+    ) -> None:
+        """
+        Synthetic Simulator with a linear
+        Args:
+            X: Features array
+            num_important_features: Number of features that contribute to EACH outcome (prog, pred0 and pred1)
+            num_interactions:  Number of features that are interacting in the outcome function
+            selection_type: Type of feature selection applied in the semi-synthetic regime
+            seed: Random seed for reproducibility
+        """
+        super(SyntheticSimulatorModulatedNonLinear, self).__init__(seed=seed)
+        assert selection_type in {"random"}
+        assert 0 <= non_linearity_scale <= 1
+        self.selection_type = selection_type
+        self.non_linearity_scale = non_linearity_scale
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
+        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+        self.prog_nonlin, self.pred0_nonlin, self.pred1_nonlin = self.sample_nonlinearities()
+
+    def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
+        assert 3 * num_important_features <= int(X.shape[1])
+        np.random.seed(self.seed)
+        prog_mask = np.zeros(shape=(X.shape[1]))
+        pred0_mask = np.zeros(shape=(X.shape[1]))
+        pred1_mask = np.zeros(shape=(X.shape[1]))
+        prog_indices, pred0_indices, pred1_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+
+        if self.selection_type == "random":
+            all_indices = np.array(range(X.shape[1]))
+            np.random.shuffle(all_indices)
+            prog_indices = all_indices[:num_important_features]
+            pred0_indices = all_indices[num_important_features:2*num_important_features]
+            pred1_indices = all_indices[2*num_important_features:3*num_important_features]
+        prog_mask[prog_indices] = 1
+        pred0_mask[pred0_indices] = 1
+        pred1_mask[pred1_indices] = 1
+        return prog_mask, pred0_mask, pred1_mask
+
+    def predict(self, X: np.ndarray) -> Tuple:
+        prog_lin = np.dot(X, self.prog_weights)
+        pred0_lin = np.dot(X, self.pred0_weights)
+        pred1_lin = np.dot(X, self.pred1_weights)
+        prog = (1-self.non_linearity_scale)*prog_lin + self.non_linearity_scale*self.prog_nonlin(prog_lin)
+        pred0 = (1-self.non_linearity_scale)*pred0_lin + self.non_linearity_scale*self.pred0_nonlin(pred0_lin)
+        pred1 = (1-self.non_linearity_scale)*pred1_lin + self.non_linearity_scale*self.pred1_nonlin(pred1_lin)
+        return prog, pred0, pred1
+
+    def get_all_important_features(self) -> np.ndarray:
+        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
+        return all_important_features
+
+    def get_predictive_features(self) -> np.ndarray:
+        pred_features = np.where((self.pred0_mask + self.pred1_mask).astype(np.int32) != 0)[0]
+        return pred_features
+
+    def get_prognostic_features(self) -> np.ndarray:
+        prog_features = np.where(self.prog_mask.astype(np.int32) != 0)[0]
+        return prog_features
+
+    def sample_nonlinearities(self) -> list[callable]:
+        random.seed(self.seed)
+        return random.choices(population=self.nonlinearities, k=3)
+
+
