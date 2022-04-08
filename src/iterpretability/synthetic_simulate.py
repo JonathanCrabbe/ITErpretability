@@ -198,7 +198,7 @@ class SyntheticSimulatorBase:
 
         _, pred0_factor, pred1_factor = self.predict(X)
 
-        te = self.scale_factor * (pred1_factor - pred0_factor)
+        te = self.scale_factor * self.predictive_scale * (pred1_factor - pred0_factor)
 
         return te
 
@@ -665,7 +665,7 @@ class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
         prog_features = np.where(self.prog_mask.astype(np.int32) != 0)[0]
         return prog_features
 
-    def sample_nonlinearities(self) -> list[callable]:
+    def sample_nonlinearities(self):
         random.seed(self.seed)
         return random.choices(population=self.nonlinearities, k=3)
 
