@@ -14,7 +14,14 @@ from sklearn.metrics import mean_squared_error
 import src.iterpretability.logger as log
 from src.iterpretability.explain import Explainer
 from src.iterpretability.datasets.data_loader import load
-from src.iterpretability.synthetic_simulate import SyntheticSimulatorLinear, SyntheticSimulatorLinearCorrelations, SyntheticSimulatorLinearPairwise
+from src.iterpretability.synthetic_simulate import (
+    SyntheticSimulatorLinear,
+    SyntheticSimulatorLinearCorrelations,
+    SyntheticSimulatorLinearPairwise,
+    SyntheticSimulatorNonLinear,
+    SyntheticSimulatorNonLinearCorrelations,
+    SyntheticSimulatorModulatedNonLinear,
+)
 from src.iterpretability.utils import (
     attribution_accuracy,
     compute_cate_metrics,
@@ -83,6 +90,13 @@ class PredictiveSensitivity:
         elif self.synthetic_simulator_type == 'linear_pairwise_interactions':
             sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
                                                    num_interactions = self.num_interactions, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear':
+            sim = SyntheticSimulatorNonLinear(X_raw_train, num_important_features=num_important_features,
+                                           random_feature_selection=random_feature_selection, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear_most_correlated':
+            sim = SyntheticSimulatorNonLinearCorrelations(X_raw_train, num_important_features=num_important_features,
+                                                       correlation_type='most_correlated', seed=self.seed)
+
         else:
             raise Exception('Unknown simulator type.')
 
@@ -287,7 +301,8 @@ class PairwiseInteractionSensitivity:
         explainer_limit: int = 100,
         save_path: Path = Path.cwd(),
         interaction_proportions: list = [0.0, 0.1, 0.5, 1.0],
-        predictive_scale: float = 1e-2,
+        predictive_scale: float = 1,
+        synthetic_simulator_type: str = "pairwise_random"
     ) -> None:
 
         self.n_units_hidden = n_units_hidden
@@ -300,6 +315,7 @@ class PairwiseInteractionSensitivity:
         self.save_path = save_path
         self.interaction_proportions = interaction_proportions
         self.predictive_scale = predictive_scale
+        self.synthetic_simulator_type = synthetic_simulator_type
 
     def run(
         self,
@@ -318,7 +334,8 @@ class PairwiseInteractionSensitivity:
             num_interactions = int(interaction_proportion*num_important_features/2)
             log.info(f"Now working with {num_interactions} ({100*interaction_proportion}%) of interactions...")
             sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
-                                             num_interactions=num_interactions, seed=self.seed)
+                                                   num_interactions=num_interactions, seed=self.seed,
+                                                   selection_type=self.synthetic_simulator_type)
             X_train, W_train, Y_train, po0_train, po1_train, propensity_train =\
                 sim.simulate_dataset(X_raw_train, predictive_scale=self.predictive_scale, binary_outcome=binary_outcome)
             X_test, W_test, Y_test, po0_test, po1_test, _ = sim.simulate_dataset(X_raw_test,
@@ -443,7 +460,188 @@ class PairwiseInteractionSensitivity:
 
         )
 
-        results_path = self.save_path / "results/interaction_sensitivity/"
+        results_path = self.save_path / f"results/interaction_sensitivity/{self.synthetic_simulator_type}"
+        log.info(f"Saving results in {results_path}...")
+        if not results_path.exists():
+            results_path.mkdir(parents=True, exist_ok=True)
+
+        metrics_df.to_csv(
+            results_path /
+            f"{dataset}_{num_important_features}_binary_{binary_outcome}-seed{self.seed}.csv")
+
+
+class NonLinearitySensitivity:
+    """
+    Sensitivity analysis for nonlinearity in prognostic and predictive functions
+    """
+
+    def __init__(
+        self,
+        n_units_hidden: int = 50,
+        n_layers: int = 1,
+        penalty_orthogonal: float = 0.01,
+        batch_size: int = 1024,
+        n_iter: int = 1000,
+        seed: int = 42,
+        explainer_limit: int = 100,
+        save_path: Path = Path.cwd(),
+        nonlinearity_scales: list = [0.0, 0.2, 0.5, 0.7,  1.0],
+        predictive_scale: float = 0.1,
+        synthetic_simulator_type: str = "random"
+    ) -> None:
+
+        self.n_units_hidden = n_units_hidden
+        self.n_layers = n_layers
+        self.penalty_orthogonal = penalty_orthogonal
+        self.batch_size = batch_size
+        self.n_iter = n_iter
+        self.seed = seed
+        self.explainer_limit = explainer_limit
+        self.save_path = save_path
+        self.nonlinearity_scales = nonlinearity_scales
+        self.predictive_scale = predictive_scale
+        self.synthetic_simulator_type = synthetic_simulator_type
+
+    def run(
+        self,
+        dataset: str = "tcga_100",
+        num_important_features: int = 15,
+        explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
+                                "shapley_value_sampling", "lime"],
+        train_ratio: float = 0.8,
+        binary_outcome: bool = False
+    ) -> None:
+        log.info(f"Using dataset {dataset} with num_important features = {num_important_features}.")
+        X_raw_train, X_raw_test = load(dataset, train_ratio=train_ratio)
+        explainability_data = []
+
+        for nonlinearity_scale in self.nonlinearity_scales:
+            log.info(f"Now working with a nonlinearity scale {nonlinearity_scale}...")
+            sim = SyntheticSimulatorModulatedNonLinear(X_raw_train, num_important_features=num_important_features,
+                                                       non_linearity_scale=nonlinearity_scale, seed=self.seed,
+                                                       selection_type=self.synthetic_simulator_type)
+            X_train, W_train, Y_train, po0_train, po1_train, propensity_train = \
+                sim.simulate_dataset(X_raw_train, predictive_scale=self.predictive_scale, binary_outcome=binary_outcome)
+            X_test, W_test, Y_test, po0_test, po1_test, _ = \
+                sim.simulate_dataset(X_raw_test, predictive_scale=self.predictive_scale, binary_outcome=binary_outcome)
+
+            log.info("Fitting and explaining learners...")
+            learners = {
+                "TLearner": cate_models.torch.TLearner(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_out=2,
+                    n_units_out=100,
+                    batch_size=1024,
+                    n_iter=self.n_iter,
+                    batch_norm=False,
+                    nonlin="relu",
+                ),
+                "SLearner": cate_models.torch.SLearner(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_out=2,
+                    n_units_out=100,
+                    n_iter=self.n_iter,
+                    batch_size=1024,
+                    batch_norm=False,
+                    nonlin="relu",
+                ),
+                "TARNet": cate_models.torch.TARNet(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_r=1,
+                    n_layers_out=1,
+                    n_units_out=100,
+                    n_units_r=100,
+                    batch_size=1024,
+                    n_iter=self.n_iter,
+                    batch_norm=False,
+                    nonlin="relu",
+                ),
+                "SNet": cate_models.torch.SNet(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_r=1,
+                    n_layers_out=1,
+                    n_units_out=100,
+                    n_units_r=50,
+                    n_units_r_small=50,
+                    batch_size=1024,
+                    n_iter=self.n_iter,
+                    batch_norm=False,
+                    penalty_orthogonal=0.01,
+                    nonlin="relu",
+                ),
+            }
+
+            learner_explainers = {}
+            learner_explanations = {}
+
+            for name in learners:
+                learners[name].fit(X=X_train, y=Y_train, w=W_train)
+                learner_explainers[name] = Explainer(
+                    learners[name],
+                    feature_names=list(range(X_train.shape[1])),
+                    explainer_list=explainer_list,
+                )
+                learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
+
+            all_important_features = sim.get_all_important_features()
+            pred_features = sim.get_predictive_features()
+            prog_features = sim.get_prognostic_features()
+
+            cate_test = sim.te(X_test)
+
+            for explainer_name in explainer_list:
+                for learner_name in learners:
+                    attribution_est = np.abs(learner_explanations[learner_name][explainer_name])
+                    acc_scores_all_features = attribution_accuracy(
+                        all_important_features, attribution_est
+                    )
+                    acc_scores_predictive_features = attribution_accuracy(pred_features, attribution_est)
+                    acc_scores_prog_features = attribution_accuracy(prog_features, attribution_est)
+                    _, mu0_pred, mu1_pred = learners[learner_name].predict(X=X_test, return_po=True)
+
+                    pehe_test, factual_rmse_test = compute_cate_metrics(cate_true=cate_test, y_true=Y_test,
+                                                                        w_true=W_test, mu0_pred=mu0_pred,
+                                                                        mu1_pred=mu1_pred)
+
+                    explainability_data.append(
+                        [
+                            nonlinearity_scale,
+                            learner_name,
+                            explainer_name,
+                            acc_scores_all_features,
+                            acc_scores_predictive_features,
+                            acc_scores_prog_features,
+                            pehe_test,
+                            factual_rmse_test,
+                            np.mean(cate_test),
+                            np.var(cate_test),
+                            pehe_test / np.sqrt(np.var(cate_test))
+                        ]
+                    )
+
+        metrics_df = pd.DataFrame(
+            explainability_data,
+            columns=[
+                "Nonlinearity Scale",
+                "Learner",
+                "Explainer",
+                "All features ACC",
+                "Pred features ACC",
+                "Prog features ACC",
+                "PEHE",
+                "Factual RMSE",
+                "CATE true mean",
+                "CATE true var",
+                "Normalized PEHE",
+            ],
+
+        )
+
+        results_path = self.save_path / f"results/nonlinearity_sensitivity/{self.synthetic_simulator_type}"
         log.info(f"Saving results in {results_path}...")
         if not results_path.exists():
             results_path.mkdir(parents=True, exist_ok=True)

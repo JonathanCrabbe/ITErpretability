@@ -1,4 +1,5 @@
 # stdlib
+import random
 from typing import Tuple
 from functools import reduce
 
@@ -259,7 +260,7 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
         X: np.ndarray,
         num_important_features: int = 10,
         num_interactions: int = 1,
-        selection_type: str = "random",
+        selection_type: str = "pairwise_random",
         seed: int = 42,
     ) -> None:
         """
@@ -272,10 +273,11 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
             seed: Random seed for reproducibility
         """
         super(SyntheticSimulatorLinearPairwise, self).__init__(seed=seed)
-        assert selection_type in {"random"}
-        self.prog_mask, self.pred0_mask, self.pred1_mask,\
+        assert selection_type in {"pairwise_random", "pairwise_prog_pred"}
+        self.selection_type = selection_type
+        self.prog_mask, self.pred0_mask, self.pred1_mask, \
         self.prog_inter_mask, self.pred0_inter_mask, self.pred1_inter_mask = \
-            self.get_important_features(X, num_important_features, num_interactions, selection_type)
+            self.get_important_features(X, num_important_features, num_interactions)
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
         self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
         self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
@@ -283,33 +285,47 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
         self.pred0_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred0_inter_mask
         self.pred1_inter_weights = np.random.uniform(-1, 1, size=(X.shape[1], X.shape[1])) * self.pred1_inter_mask
 
-    def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1,
-                               selection_type: str = "random") -> Tuple:
-        assert 3*num_important_features <= int(X.shape[1]) and 2*num_interactions <= num_important_features
-        num_linear = num_important_features - 2*num_interactions
+    def get_important_features(self, X: np.ndarray, num_important_features: int, num_interactions: int = 1) -> Tuple:
+        assert 3 * num_important_features <= int(X.shape[1]) and 2*num_interactions <= num_important_features
+        np.random.seed(self.seed)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
         prog_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
         pred0_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
         pred1_inter_mask = np.zeros(shape=(X.shape[1], X.shape[1]))
-        if selection_type == "random":
+        prog_indices, pred0_indices, pred1_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+        prog_inter_indices, pred0_inter_indices, pred1_inter_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+
+        if self.selection_type == "pairwise_random":
+            num_linear = num_important_features - 2 * num_interactions
             all_indices = np.array(range(X.shape[1]))
             np.random.shuffle(all_indices)
             prog_indices = all_indices[:num_linear]
-            pred0_indices = all_indices[num_linear:2*num_linear]
-            pred1_indices = all_indices[2*num_linear:3*num_linear]
-            prog_inter_indices = all_indices[3*num_linear:3*num_linear+2*num_interactions]
-            pred0_inter_indices = all_indices[3*num_linear+2*num_interactions:
-                                              3*num_linear+4*num_interactions]
-            pred1_inter_indices = all_indices[3*num_linear+4*num_interactions:
-                                              3*num_linear+6*num_interactions]
+            pred0_indices = all_indices[num_linear:2 * num_linear]
+            pred1_indices = all_indices[2 * num_linear:3 * num_linear]
+            prog_inter_indices = all_indices[3 * num_linear:3 * num_linear + 2 * num_interactions]
+            pred0_inter_indices = all_indices[3 * num_linear + 2 * num_interactions:
+                                              3 * num_linear + 4 * num_interactions]
+            pred1_inter_indices = all_indices[3 * num_linear + 4 * num_interactions:
+                                              3 * num_linear + 6 * num_interactions]
+            prog_inter_mask[prog_inter_indices[::2], prog_inter_indices[1::2]] = 1
+            pred0_inter_mask[pred0_inter_indices[::2], pred0_inter_indices[1::2]] = 1
+            pred1_inter_mask[pred1_inter_indices[::2], pred1_inter_indices[1::2]] = 1
+        elif self.selection_type == "pairwise_prog_pred":
+            all_indices = np.array(range(X.shape[1]))
+            np.random.shuffle(all_indices)
+            prog_indices = all_indices[:num_important_features]
+            pred0_indices = all_indices[num_important_features:2*num_important_features]
+            pred1_indices = all_indices[2*num_important_features:3*num_important_features]
+            prog_inter_indices = all_indices[3*num_important_features:3*num_important_features+2*num_interactions]
+            prog_inter_mask[prog_inter_indices[::2], pred0_indices[:num_interactions]] = 1
+            prog_inter_mask[prog_inter_indices[1::2], pred1_indices[:num_interactions]] = 1
+
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
         pred1_mask[pred1_indices] = 1
-        prog_inter_mask[prog_inter_indices[::2], prog_inter_indices[1::2]] = 1
-        pred0_inter_mask[pred0_inter_indices[::2], pred0_inter_indices[1::2]] = 1
-        pred1_inter_mask[pred1_inter_indices[::2], pred1_inter_indices[1::2]] = 1
+
         return prog_mask, pred0_mask, pred1_mask, prog_inter_mask, pred0_inter_mask, pred1_inter_mask
 
     def predict(self, X: np.ndarray) -> Tuple:
@@ -324,7 +340,8 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
 
     def get_predictive_features(self) -> np.ndarray:
         pred_features = np.union1d(np.where((self.pred0_mask + self.pred1_mask).astype(np.int32) != 0)[0],
-                                   np.argwhere((self.pred0_inter_mask + self.pred1_inter_mask).astype(np.int32) != 0).flatten())
+                                   np.argwhere(
+                                       (self.pred0_inter_mask + self.pred1_inter_mask).astype(np.int32) != 0).flatten())
 
         return pred_features
 
@@ -337,9 +354,8 @@ class SyntheticSimulatorLinearPairwise(SyntheticSimulatorBase):
         inter_features = np.argwhere((self.pred0_inter_mask +
                                       self.pred1_inter_mask +
                                       self.prog_inter_mask
-                                       ).astype(np.int32) != 0).flatten()
+                                      ).astype(np.int32) != 0).flatten()
         return inter_features
-
 
 
 class SyntheticSimulatorLinearCorrelations(SyntheticSimulatorBase):
@@ -387,7 +403,8 @@ class SyntheticSimulatorLinearCorrelations(SyntheticSimulatorBase):
         pred1_mask = np.zeros(shape=(X.shape[1]))
 
         if self.correlation_type == 'least_correlated':
-            self.features_shortlist = get_correlated_features(X, 3 * num_important_features, most_correlated=False, return_couples=False)
+            self.features_shortlist = get_correlated_features(X, 3 * num_important_features, most_correlated=False,
+                                                              return_couples=False)
             np.random.shuffle(self.features_shortlist)
 
             prog_indices = self.features_shortlist[:num_important_features]
@@ -395,30 +412,39 @@ class SyntheticSimulatorLinearCorrelations(SyntheticSimulatorBase):
             pred1_indices = self.features_shortlist[(2 * num_important_features):(3 * num_important_features)]
 
         elif self.correlation_type == 'most_correlated':
-            self.features_shortlist, self.most_correlated_couples, _ = get_correlated_features(X, 2 * num_important_features,
-                                                                                          most_correlated=True, return_couples=True)
+            self.features_shortlist, self.most_correlated_couples, _ = get_correlated_features(X,
+                                                                                               3 * num_important_features,
+                                                                                               most_correlated=True,
+                                                                                               return_couples=True)
 
-            np.random.shuffle(self.features_shortlist)
-            pred0_indices = self.features_shortlist[:num_important_features]
-            pred1_indices = self.features_shortlist[num_important_features:(2 * num_important_features)]
+            prog_indices = self.features_shortlist[:num_important_features]
 
             features_diff_list = []
             for i in range(2 * num_important_features):
-                features_diff_list.append(np.setdiff1d(self.most_correlated_couples[i], self.features_shortlist))
+                features_diff_list.append(
+                    np.setdiff1d(self.most_correlated_couples[i], prog_indices, assume_unique=True))
 
             most_correlated_selected_features = []
-            for i in range(2 * num_important_features):
-                features_diff_list[i] = np.setdiff1d(features_diff_list[i], most_correlated_selected_features)
-                if (len(features_diff_list[i]) > 0):
+            for i in range(num_important_features):
+                features_diff_list[i] = np.setdiff1d(features_diff_list[i], most_correlated_selected_features,
+                                                     assume_unique=True)
+                if (len(features_diff_list[i]) >= 2):
+                    most_correlated_selected_features.append(features_diff_list[i][0])
+                    most_correlated_selected_features.append(features_diff_list[i][1])
+                elif (len(features_diff_list[i]) == 1):
                     most_correlated_selected_features.append(features_diff_list[i][0])
 
             np.random.shuffle(most_correlated_selected_features)
-            self.num_prognostic_features = np.minimum(num_important_features, len(most_correlated_selected_features))
-            print (self.num_prognostic_features)
-            prog_indices = most_correlated_selected_features[:self.num_prognostic_features]
+            self.num_predictive_features = np.minimum(num_important_features,
+                                                      int(len(most_correlated_selected_features) / 2))
+
+            pred0_indices = most_correlated_selected_features[:self.num_predictive_features]
+            pred1_indices = most_correlated_selected_features[
+                            self.num_predictive_features:2 * self.num_predictive_features]
+
+
         else:
             raise Exception('Unknown correlation type.')
-
 
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
@@ -432,5 +458,183 @@ class SyntheticSimulatorLinearCorrelations(SyntheticSimulatorBase):
         pred1 = np.dot(X, self.pred1_weights)
 
         return prog, pred0, pred1
+
+
+class SyntheticSimulatorNonLinear(SyntheticSimulatorLinear):
+    """
+    Data generation process.
+
+    Args:
+        X: np.ndarray/pd.DataFrame
+            Baseline covariates
+        num_important_features: Number of features that contribute to EACH outcome (prog, pred0 and pred1)
+        seed: int
+            Random seed
+
+    Returns:
+        X: the same set of covariates
+        W_synth: simulated treatments
+        Y_synth: simulated outcomes
+        prog_out: the prognostic outcome for X
+        po0, po1: potential outcomes for X
+        est: the RandomEstimator used
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        num_important_features: int = 10,
+        random_feature_selection: bool = True,
+        seed: int = 42,
+    ) -> None:
+        super(SyntheticSimulatorNonLinear, self).__init__(X=X, num_important_features=num_important_features,
+                                                          random_feature_selection=random_feature_selection, seed=seed)
+
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features,
+                                                                                       random_feature_selection)
+        self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
+        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+
+    def predict(self, X: np.ndarray) -> Tuple:
+        prog = np.exp(-np.abs(np.dot(X, self.prog_weights)))
+        pred0 = np.cos(np.dot(X, self.pred0_weights))
+        pred1 = np.sin(np.dot(X, self.pred1_weights))
+
+        return prog, pred0, pred1
+
+
+class SyntheticSimulatorNonLinearCorrelations(SyntheticSimulatorLinearCorrelations):
+    """
+    Data generation process.
+
+    Args:
+        X: np.ndarray/pd.DataFrame
+            Baseline covariates
+        seed: int
+            Random seed
+        predictive_scale: float
+            Parameter to control the magnitude of the predictive effect.
+
+    Returns:
+        X: the same set of covariates
+        W_synth: simulated treatments
+        Y_synth: simulated outcomes
+        prog_out: the prognostic outcome for X
+        po0, po1: potential outcomes for X
+        est: the RandomEstimator used
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        num_important_features: int = 10,
+        correlation_type: str = 'most_correlated',
+        seed: int = 42,
+    ) -> None:
+        super(SyntheticSimulatorNonLinearCorrelations, self).__init__(X=X,
+                                                                      num_important_features=num_important_features,
+                                                                      correlation_type=correlation_type, seed=seed)
+
+        self.correlation_type = correlation_type
+
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
+        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+
+    def predict(self, X: np.ndarray) -> Tuple:
+        prog = np.exp(-np.abs(np.dot(X, self.prog_weights)))
+        pred0 = np.cos(np.dot(X, self.pred0_weights))
+        pred1 = np.sin(np.dot(X, self.pred1_weights))
+
+        return prog, pred0, pred1
+
+
+class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
+    nonlinearities = [
+        lambda x: np.abs(x),
+        lambda x: np.exp(-(x**2)/2),
+        lambda x: 1/(1+x**2),
+        lambda x: np.cos(x),
+        lambda x: np.arctan(x),
+        lambda x: np.tanh(x),
+        lambda x: np.sigmoid(x),
+        lambda x: np.log(1+x**2),
+        lambda x: np.sqrt(1+x**2),
+        lambda x: np.relu(x)
+    ]
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        non_linearity_scale: float,
+        num_important_features: int = 10,
+        selection_type: str = "random",
+        seed: int = 42,
+    ) -> None:
+        """
+        Synthetic Simulator with a linear
+        Args:
+            X: Features array
+            num_important_features: Number of features that contribute to EACH outcome (prog, pred0 and pred1)
+            num_interactions:  Number of features that are interacting in the outcome function
+            selection_type: Type of feature selection applied in the semi-synthetic regime
+            seed: Random seed for reproducibility
+        """
+        super(SyntheticSimulatorModulatedNonLinear, self).__init__(seed=seed)
+        assert selection_type in {"random"}
+        assert 0 <= non_linearity_scale <= 1
+        self.selection_type = selection_type
+        self.non_linearity_scale = non_linearity_scale
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
+        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+        self.prog_nonlin, self.pred0_nonlin, self.pred1_nonlin = self.sample_nonlinearities()
+
+    def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
+        assert 3 * num_important_features <= int(X.shape[1])
+        np.random.seed(self.seed)
+        prog_mask = np.zeros(shape=(X.shape[1]))
+        pred0_mask = np.zeros(shape=(X.shape[1]))
+        pred1_mask = np.zeros(shape=(X.shape[1]))
+        prog_indices, pred0_indices, pred1_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+
+        if self.selection_type == "random":
+            all_indices = np.array(range(X.shape[1]))
+            np.random.shuffle(all_indices)
+            prog_indices = all_indices[:num_important_features]
+            pred0_indices = all_indices[num_important_features:2*num_important_features]
+            pred1_indices = all_indices[2*num_important_features:3*num_important_features]
+        prog_mask[prog_indices] = 1
+        pred0_mask[pred0_indices] = 1
+        pred1_mask[pred1_indices] = 1
+        return prog_mask, pred0_mask, pred1_mask
+
+    def predict(self, X: np.ndarray) -> Tuple:
+        prog_lin = np.dot(X, self.prog_weights)
+        pred0_lin = np.dot(X, self.pred0_weights)
+        pred1_lin = np.dot(X, self.pred1_weights)
+        prog = (1-self.non_linearity_scale)*prog_lin + self.non_linearity_scale*self.prog_nonlin(prog_lin)
+        pred0 = (1-self.non_linearity_scale)*pred0_lin + self.non_linearity_scale*self.pred0_nonlin(pred0_lin)
+        pred1 = (1-self.non_linearity_scale)*pred1_lin + self.non_linearity_scale*self.pred1_nonlin(pred1_lin)
+        return prog, pred0, pred1
+
+    def get_all_important_features(self) -> np.ndarray:
+        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
+        return all_important_features
+
+    def get_predictive_features(self) -> np.ndarray:
+        pred_features = np.where((self.pred0_mask + self.pred1_mask).astype(np.int32) != 0)[0]
+        return pred_features
+
+    def get_prognostic_features(self) -> np.ndarray:
+        prog_features = np.where(self.prog_mask.astype(np.int32) != 0)[0]
+        return prog_features
+
+    def sample_nonlinearities(self):
+        random.seed(self.seed)
+        return random.choices(population=self.nonlinearities, k=3)
 
 

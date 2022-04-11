@@ -3,8 +3,8 @@ import sys
 from typing import Any
 
 import src.iterpretability.logger as log
-from src.iterpretability.synthetic_experiment import PredictiveSensitivity, \
-    PairwiseInteractionSensitivity, PropensitySensitivity
+from src.iterpretability.synthetic_experiment import (PredictiveSensitivity, PairwiseInteractionSensitivity,
+                                                      NonLinearitySensitivity, PropensitySensitivity)
 
 
 def init_arg() -> Any:
@@ -40,11 +40,7 @@ def init_arg() -> Any:
         "--binary_outcome_list",
         nargs="+",
         type=bool,
-        default=[False,
-                 # True,
-                 # False,
-                 # True
-                 ],
+        default=[False],
     )
 
     # Arguments for Propensity Sensitivity Experiment
@@ -103,7 +99,27 @@ if __name__ == "__main__":
         elif args.experiment_name == "interaction_sensitivity":
             exp = PairwiseInteractionSensitivity(
                 seed=seed,
-                explainer_limit=args.explainer_limit
+                explainer_limit=args.explainer_limit,
+                synthetic_simulator_type=args.synthetic_simulator_type
+            )
+            for experiment_id in range(len(args.dataset_list)):
+                log.info(
+                    f"Running experiment for {args.dataset_list[experiment_id]}, "
+                    f"{args.num_important_features_list[experiment_id]} important features "
+                    f"with binary outcome {args.binary_outcome_list[experiment_id]}")
+
+                exp.run(
+                    dataset=args.dataset_list[experiment_id],
+                    train_ratio=args.train_ratio,
+                    num_important_features=args.num_important_features_list[experiment_id],
+                    binary_outcome=args.binary_outcome_list[experiment_id],
+                    explainer_list=args.explainer_list,
+                )
+        elif args.experiment_name == "nonlinearity_sensitivity":
+            exp = NonLinearitySensitivity(
+                seed=seed,
+                explainer_limit=args.explainer_limit,
+                synthetic_simulator_type=args.synthetic_simulator_type
             )
             for experiment_id in range(len(args.dataset_list)):
                 log.info(
