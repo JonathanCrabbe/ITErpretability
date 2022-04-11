@@ -63,7 +63,6 @@ class SyntheticSimulatorBase:
         noise: bool = False,
         err_std: float = 0.01,
         prop_scale: float = 1,
-        addvar_scale: float = 0.1,
         binary_outcome: bool = False
     ) -> Tuple:
         enable_reproducible_results(self.seed)
@@ -73,7 +72,6 @@ class SyntheticSimulatorBase:
         self.noise = noise
         self.err_std = err_std
         self.prop_scale = prop_scale
-        self.addvar_scale = addvar_scale
 
         prog, pred0, pred1 = self.predict(X)
 
@@ -91,26 +89,12 @@ class SyntheticSimulatorBase:
             # compute normalized predictive score to get propensity score
             pred_score = zscore(pred1 - pred0)
             propensity = expit(self.prop_scale * pred_score)
-        elif self.treatment_assign == "linear":
-            # assign treatment according to random linear predictor as in GANITE
-            # simulate coefficient
-            coef = np.random.uniform(-0.01, 0.01, size=[X.shape[1], 1])
-            exponent = zscore(np.matmul(X, coef)).reshape(
-                X.shape[0],
-            )
-            propensity = expit(self.prop_scale * exponent)
         elif self.treatment_assign == "top_pred":
             # find top predictive feature, assign treatment according to that
             pred_act = (
-                (
-                    torch.sum(torch.abs(self.est.pred0.model[0].weight), dim=0)
-                    + torch.sum(torch.abs(self.est.pred1.model[0].weight), dim=0)
-                )
-                    .detach()
-                    .cpu()
-                    .numpy()
+                self.pred0_weights + self.pred1_weights
             )
-            top_idx = np.argmax(pred_act)
+            top_idx = np.argmax(np.abs(pred_act))
             self.top_idx = top_idx
             exponent = zscore(X[:, top_idx]).reshape(
                 X.shape[0],
@@ -118,26 +102,17 @@ class SyntheticSimulatorBase:
             propensity = expit(self.prop_scale * exponent)
         elif self.treatment_assign == "top_prog":
             # find top prognostic feature, assign treatment according to that
-            prog_act = (
-                torch.sum(torch.abs(self.est.prog.model[0].weight), dim=0)
-                    .detach()
-                    .cpu()
-                    .numpy()
-            )
-            top_idx = np.argmax(prog_act)
+            top_idx = np.argmax(np.abs(self.prog_weights))
             self.top_idx = top_idx
             exponent = zscore(X[:, top_idx]).reshape(
                 X.shape[0],
             )
             propensity = expit(self.prop_scale * exponent)
         elif self.treatment_assign == "irrelevant_var":
-            prog_act = (
-                torch.sum(torch.abs(self.est.prog.model[0].weight), dim=0)
-                    .detach()
-                    .cpu()
-                    .numpy()
+            all_act = (
+                self.prog_weights + self.pred1_weights + self.pred0_weights
             )
-            top_idx = np.argmax(prog_act)
+            top_idx = np.argmin(np.abs(all_act)) # chooses an index with 0 weight
             self.top_idx = top_idx
 
             exponent = zscore(X[:, top_idx]).reshape(
@@ -145,13 +120,6 @@ class SyntheticSimulatorBase:
             )
             propensity = expit(self.prop_scale * exponent)
 
-            # remove effect of this variable and recompute
-            X_local = X.copy()
-            X_local[:, top_idx] = 0
-            _, _, prog, pred0, pred1 = self.est.predict(X_local)
-            prog = prog.detach().cpu().numpy()
-            pred0 = pred0.detach().cpu().numpy()
-            pred1 = pred1.detach().cpu().numpy()
         else:
             raise ValueError(
                 f"{treatment_assign} is not a valid treatment assignment mechanism."
@@ -197,7 +165,7 @@ class SyntheticSimulatorBase:
 
         _, pred0_factor, pred1_factor = self.predict(X)
 
-        te = self.scale_factor * (pred1_factor - pred0_factor)
+        te = self.scale_factor * self.predictive_scale * (pred1_factor - pred0_factor)
 
         return te
 

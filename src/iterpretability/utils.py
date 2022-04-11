@@ -45,6 +45,9 @@ learner_colors = {
     "SNet_noprop": cblind_palete[5],
     "CFRNet_0.001": cblind_palete[6],
     "CFRNet_0.0001": cblind_palete[7],
+    "SNet_0": cblind_palete[5],
+    "SNet_0.1": cblind_palete[6],
+    "SNet_0.001": cblind_palete[7],
     "Truth": cblind_palete[7],
 }
 
@@ -211,7 +214,8 @@ def dataframe_line_plot(
         learners: list,
         x_logscale: bool = True,
         aggregate: bool = False,
-        aggregate_type: str = 'mean'
+        aggregate_type: str = 'mean',
+        plotse: bool = False
 ) -> plt.Figure:
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -222,6 +226,9 @@ def dataframe_line_plot(
                 (df["Learner"] == learner_name) & (df["Explainer"] == explainer_name)
                 ]
             if aggregate:
+                if plotse:
+                    # compute se
+                    se_df = sub_df.groupby(x_axis).sem().reset_index().copy()
                 sub_df = sub_df.groupby(x_axis).agg(aggregate_type).reset_index()
             x_values = sub_df.loc[:, x_axis].values
             y_values = sub_df.loc[:, y_axis].values
@@ -231,6 +238,16 @@ def dataframe_line_plot(
                 color=learner_colors[learner_name],
                 marker=explainer_symbols[explainer_name],
             )
+
+            if plotse:
+                upper = y_values + se_df.loc[:, y_axis].values
+                lower = y_values - se_df.loc[:, y_axis].values
+
+                ax.fill_between(x_values, lower, upper,
+                                interpolate=False,
+                                color=learner_colors[learner_name],
+                                alpha=0.2)
+
 
     learner_lines = [
         Line2D([0], [0], color=learner_colors[learner_name], lw=2)
