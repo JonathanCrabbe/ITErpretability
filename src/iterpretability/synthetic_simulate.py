@@ -559,10 +559,10 @@ class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
         lambda x: np.cos(x),
         lambda x: np.arctan(x),
         lambda x: np.tanh(x),
-        lambda x: np.sigmoid(x),
+        lambda x: np.sin(x),
         lambda x: np.log(1+x**2),
         lambda x: np.sqrt(1+x**2),
-        lambda x: np.relu(x)
+        lambda x: np.cosh(x)
     ]
 
     def __init__(
