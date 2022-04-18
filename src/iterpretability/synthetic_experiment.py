@@ -666,9 +666,8 @@ class PropensitySensitivity:
         seed: int = 42,
         explainer_limit: int = 100,
         save_path: Path = Path.cwd(),
-        predictive_scale: float = 1e-1,
         num_interactions: int = 1,
-        synthetic_simulator_type: str = 'linear',
+        synthetic_simulator_type: str = 'nonlinear',
         propensity_type: str = 'prognostic',
         propensity_scales: list = [1e-2, 1e-1, 1, 10]
     ) -> None:
@@ -694,6 +693,7 @@ class PropensitySensitivity:
         binary_outcome: bool = False,
         random_feature_selection: bool = True,
         predictive_scale: float = 1e-1,
+        nonlinearity_scale: float = 0,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling", "lime"],
     ) -> None:
@@ -716,6 +716,11 @@ class PropensitySensitivity:
         elif self.synthetic_simulator_type == 'linear_pairwise_interactions':
             sim = SyntheticSimulatorLinearPairwise(X_raw_train, num_important_features=num_important_features,
                                                    num_interactions=self.num_interactions, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear':
+            sim = SyntheticSimulatorModulatedNonLinear(X_raw_train,
+                                                       num_important_features=num_important_features,
+                                                       non_linearity_scale=nonlinearity_scale,
+                                                       seed=self.seed)
         else:
             raise Exception('Unknown simulator type.')
 
@@ -882,7 +887,9 @@ class PropensitySensitivity:
         if not results_path.exists():
             results_path.mkdir(parents=True, exist_ok=True)
 
-        metrics_df.to_csv(results_path / f"new_propensity_scale_{dataset}_{num_important_features}_"
+        metrics_df.to_csv(results_path / f"propensity_scale_{dataset}_{num_important_features}_"
                                          f"proptype_{self.propensity_type}_"
                                          f"predscl_{predictive_scale}_"
+                                         f"nonlinscl_{nonlinearity_scale}_"
+                                         f"trainratio_{train_ratio}_"
                                          f"binary_{binary_outcome}-seed{self.seed}.csv")

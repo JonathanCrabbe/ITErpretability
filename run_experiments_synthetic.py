@@ -10,10 +10,10 @@ from src.iterpretability.synthetic_experiment import (PredictiveSensitivity, Pai
 def init_arg() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment_name", default="propensity_sensitivity", type=str)
-    parser.add_argument("--train_ratio", default=0.8, type=float)
+    parser.add_argument("--train_ratio", default=0.1, type=float)
 
     # Arguments for Predictive Sensitivity Experiment
-    parser.add_argument("--synthetic_simulator_type", default='linear', type=str)
+    parser.add_argument("--synthetic_simulator_type", default='nonlinear', type=str)
     parser.add_argument("--random_feature_selection", default=True, type=bool)
 
     parser.add_argument(
@@ -44,15 +44,17 @@ def init_arg() -> Any:
     )
 
     # Arguments for Propensity Sensitivity Experiment
-    parser.add_argument("--propensity_types", default=["top_pred", "top_prog", #"pred", "prog", #
-                                                       "irrelevant_var"],
+    parser.add_argument("--propensity_types", default=["irrelevant_var"], #, "top_prog", #"pred",
+                        # "prog", #
+                                                       #"irrelevant_var"],
                         type=str, nargs="+")
     parser.add_argument(
-        "--propensity_scales", nargs="+", default=[0, 1, 10], type=float
+        "--propensity_scales", nargs="+", default=[0, 2, 4, 6], type=float
     )
+    parser.add_argument("--nonlinearity_scale", default=1, type=float)
     parser.add_argument("--predictive_scale", default=1, type=float)
     parser.add_argument(
-        "--seed_list", nargs="+", default=[42, 666, 25, 77, 55
+        "--seed_list", nargs="+", default=[25, 77, 55,
                                            # 42, 666, 25, 77, 55, 88, 99, 10, 2, 50
                                            ], type=int
     )
@@ -157,7 +159,8 @@ if __name__ == "__main__":
                         random_feature_selection=args.random_feature_selection,
                         binary_outcome=args.binary_outcome_list[experiment_id],
                         explainer_list=args.explainer_list,
-                        predictive_scale=args.predictive_scale
+                        predictive_scale=args.predictive_scale,
+                        nonlinearity_scale=args.nonlinearity_scale
                     )
         else:
             raise ValueError("The experiment name is invalid.")
