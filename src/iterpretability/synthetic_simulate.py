@@ -100,45 +100,11 @@ class SyntheticSimulatorBase:
                 X.shape[0],
             )
             propensity = expit(self.prop_scale * exponent)
-        elif self.treatment_assign == "top_pred":
-            # find top predictive feature, assign treatment according to that
-            pred_act = (
-                (
-                    torch.sum(torch.abs(self.est.pred0.model[0].weight), dim=0)
-                    + torch.sum(torch.abs(self.est.pred1.model[0].weight), dim=0)
-                )
-                    .detach()
-                    .cpu()
-                    .numpy()
-            )
-            top_idx = np.argmax(pred_act)
-            self.top_idx = top_idx
-            exponent = zscore(X[:, top_idx]).reshape(
-                X.shape[0],
-            )
-            propensity = expit(self.prop_scale * exponent)
-        elif self.treatment_assign == "top_prog":
-            # find top prognostic feature, assign treatment according to that
-            prog_act = (
-                torch.sum(torch.abs(self.est.prog.model[0].weight), dim=0)
-                    .detach()
-                    .cpu()
-                    .numpy()
-            )
-            top_idx = np.argmax(prog_act)
-            self.top_idx = top_idx
-            exponent = zscore(X[:, top_idx]).reshape(
-                X.shape[0],
-            )
-            propensity = expit(self.prop_scale * exponent)
         elif self.treatment_assign == "irrelevant_var":
-            prog_act = (
-                torch.sum(torch.abs(self.est.prog.model[0].weight), dim=0)
-                    .detach()
-                    .cpu()
-                    .numpy()
+            all_act = (
+                self.prog_weights + self.pred1_weights + self.pred0_weights
             )
-            top_idx = np.argmax(prog_act)
+            top_idx = np.argmin(np.abs(all_act))  # chooses an index with 0 weight
             self.top_idx = top_idx
 
             exponent = zscore(X[:, top_idx]).reshape(
@@ -146,13 +112,6 @@ class SyntheticSimulatorBase:
             )
             propensity = expit(self.prop_scale * exponent)
 
-            # remove effect of this variable and recompute
-            X_local = X.copy()
-            X_local[:, top_idx] = 0
-            _, _, prog, pred0, pred1 = self.est.predict(X_local)
-            prog = prog.detach().cpu().numpy()
-            pred0 = pred0.detach().cpu().numpy()
-            pred1 = pred1.detach().cpu().numpy()
         else:
             raise ValueError(
                 f"{treatment_assign} is not a valid treatment assignment mechanism."

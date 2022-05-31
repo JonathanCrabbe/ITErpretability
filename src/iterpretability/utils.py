@@ -45,7 +45,9 @@ learner_colors = {
     "SNet_noprop": cblind_palete[5],
     "CFRNet_0.001": cblind_palete[6],
     "CFRNet_0.0001": cblind_palete[7],
-    "Truth": cblind_palete[7],
+    "DRLearner": cblind_palete[8],
+    "RALearner": cblind_palete[9],
+    "Truth": cblind_palete[9],
 }
 
 
@@ -259,6 +261,13 @@ def dataframe_line_plot(
     ax.set_ylabel(y_axis)
     return fig
 
+
+def compute_pehe(
+        cate_true: np.ndarray,
+        cate_pred: torch.Tensor,
+) -> tuple:
+    pehe = np.sqrt(mean_squared_error(cate_true, cate_pred.detach().cpu().numpy()))
+    return pehe
 
 def compute_cate_metrics(
         cate_true: np.ndarray,
