@@ -61,8 +61,8 @@ class SyntheticSimulatorBase:
         predictive_scale: float = 1,
         scale_factor: float = 1,
         treatment_assign: str = "random",
-        noise: bool = False,
-        err_std: float = 0.01,
+        noise: bool = True,
+        err_std: float = 0.1,
         prop_scale: float = 1,
         addvar_scale: float = 0.1,
         binary_outcome: bool = False

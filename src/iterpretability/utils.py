@@ -47,6 +47,7 @@ learner_colors = {
     "CFRNet_0.0001": cblind_palete[7],
     "DRLearner": cblind_palete[8],
     "RALearner": cblind_palete[9],
+    "XLearner": cblind_palete[5],
     "Truth": cblind_palete[9],
 }
 

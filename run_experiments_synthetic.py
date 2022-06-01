@@ -3,13 +3,14 @@ import sys
 from typing import Any
 
 import src.iterpretability.logger as log
-from src.iterpretability.synthetic_experiment import (PredictiveSensitivity, PairwiseInteractionSensitivity, PropensitySensitivity,
+from src.iterpretability.synthetic_experiment import (PredictiveSensitivity, PairwiseInteractionSensitivity,
+                                                      PropensitySensitivity,
                                                       NonLinearitySensitivity)
 
 
 def init_arg() -> Any:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment_name", default="predictive_sensitivity", type=str)
+    parser.add_argument("--experiment_name", default="propensity_sensitivity", type=str)
     parser.add_argument("--train_ratio", default=0.8, type=float)
 
     # Arguments for Predictive Sensitivity Experiment
@@ -21,14 +22,14 @@ def init_arg() -> Any:
         "--dataset_list",
         nargs="+",
         type=str,
-        default=["twins", "acic", "covid", "tcga_20", "tcga_100", "news_100"],
+        default=["twins", "acic", "tcga_20", "tcga_100", "news_100"],
     )
 
     parser.add_argument(
         "--num_important_features_list",
         nargs="+",
         type=int,
-        default=[8, 10, 4, 4, 20, 20],
+        default=[8, 10, 4, 20, 20],
     )
 
     parser.add_argument(
@@ -38,12 +39,14 @@ def init_arg() -> Any:
         default=[False, False, False, False, False, False],
     )
 
-    parser.add_argument("--propensity_types", default=["irrelevant_var"], type=str, nargs="+")
+    parser.add_argument("--propensity_types", default=["pred", "prog", "irrelevant_var"], type=str, nargs="+")
 
     # Arguments for Propensity Sensitivity Experiment
     parser.add_argument("--predictive_scale", default=1.0, type=float)
     parser.add_argument(
-        "--seed_list", nargs="+", default=[42, 25, 77, 55, 88, 99, 10, 2, 50, 100], type=int
+        "--seed_list", nargs="+", default=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                                           11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+                                           21, 22, 23, 24, 25, 26, 27, 28, 29, 30, ], type=int
     )
     parser.add_argument(
         "--explainer_list",
@@ -54,18 +57,9 @@ def init_arg() -> Any:
                  "integrated_gradients",
                  "shapley_value_sampling"],
     )
-    parser.add_argument(
-        "--learner_list",
-        nargs="+",
-        type=str,
-        default=["TARNet", "CFRNet", "SNet", "SNet_noprop", "TLearner", "SLearner"],
-    )
+
     parser.add_argument("--run_name", type=str, default="results")
-    parser.add_argument("--explainer_limit", type=int, default=100)
-    parser.add_argument("--n_layers_r", type=int, default=1)
-    parser.add_argument("--ortho_reg_type", type=str, default="abs")
-    parser.add_argument("--penalty_orthogonal", type=float, default=0.01)
-    parser.add_argument("--addvar_scale", type=float, default=0.1)
+    parser.add_argument("--explainer_limit", type=int, default=1000)
     return parser.parse_args()
 
 
@@ -73,7 +67,8 @@ if __name__ == "__main__":
     log.add(sink=sys.stderr, level="INFO")
     args = init_arg()
     for seed in args.seed_list:
-        log.info(f"Experiment {args.experiment_name} with simulator {args.synthetic_simulator_type} and seed {seed}.")
+        log.info(
+            f"Experiment {args.experiment_name} with simulator {args.synthetic_simulator_type}, explainer limit {args.explainer_limit} and seed {seed}.")
         if args.experiment_name == "predictive_sensitivity":
             exp = PredictiveSensitivity(
                 seed=seed,

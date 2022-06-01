@@ -147,34 +147,6 @@ class PredictiveSensitivity:
                     batch_norm=False,
                     nonlin="relu",
                 ),
-                "SNet": cate_models.torch.SNet(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_r=1,
-                    n_layers_out=1,
-                    n_units_out=100,
-                    n_units_r=50,
-                    n_units_r_small=50,
-                    batch_size=1024,
-                    n_iter=self.n_iter,
-                    batch_norm=False,
-                    penalty_orthogonal=0.01,
-                    nonlin="relu",
-                ),
-                "SNet_0.00": cate_models.torch.SNet(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_r=1,
-                    n_layers_out=1,
-                    n_units_out=100,
-                    n_units_r=50,
-                    n_units_r_small=50,
-                    batch_size=1024,
-                    n_iter=self.n_iter,
-                    batch_norm=False,
-                    penalty_orthogonal=0.00,
-                    nonlin="relu",
-                ),
                 "DRLearner": cate_models.torch.DRLearner(
                     X_train.shape[1],
                     binary_y=(len(np.unique(Y_train)) == 2),
@@ -298,7 +270,7 @@ class PropensitySensitivity:
         num_interactions: int = 1,
         synthetic_simulator_type: str = 'nonlinear',
         propensity_type: str = 'pred',
-        propensity_scales: list = [0, 1e-1, 1, 2, 5, 10]
+        propensity_scales: list = [0, 0.5, 1, 2, 5, 10]
     ) -> None:
 
         self.n_units_hidden = n_units_hidden
@@ -322,7 +294,7 @@ class PropensitySensitivity:
         binary_outcome: bool = False,
         random_feature_selection: bool = True,
         predictive_scale: float = 1,
-        nonlinearity_scale: float = 0,
+        nonlinearity_scale: float = 0.5,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling"],
     ) -> None:
@@ -334,6 +306,10 @@ class PropensitySensitivity:
         if self.synthetic_simulator_type == 'linear':
             sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
                                            random_feature_selection=random_feature_selection, seed=self.seed)
+        elif self.synthetic_simulator_type == 'nonlinear':
+            sim = SyntheticSimulatorModulatedNonLinear(X_raw_train, num_important_features=num_important_features,
+                                                       non_linearity_scale=nonlinearity_scale, seed=self.seed,
+                                                       selection_type=self.synthetic_simulator_type)
         else:
             raise Exception('Unknown simulator type.')
 
@@ -387,18 +363,35 @@ class PropensitySensitivity:
                     batch_norm=False,
                     nonlin="relu",
                 ),
-                "CFRNet": cate_models.torch.TARNet(
+                "DRLearner": cate_models.torch.DRLearner(
                     X_train.shape[1],
                     binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_r=1,
-                    n_layers_out=1,
+                    n_layers_out=2,
                     n_units_out=100,
-                    n_units_r=100,
-                    batch_size=1024,
                     n_iter=self.n_iter,
+                    batch_size=1024,
                     batch_norm=False,
                     nonlin="relu",
-                    penalty_disc=0.01,
+                ),
+                "RALearner": cate_models.torch.RALearner(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_out=2,
+                    n_units_out=100,
+                    n_iter=self.n_iter,
+                    batch_size=1024,
+                    batch_norm=False,
+                    nonlin="relu",
+                ),
+                "XLearner": cate_models.torch.XLearner(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_out=2,
+                    n_units_out=100,
+                    n_iter=self.n_iter,
+                    batch_size=1024,
+                    batch_norm=False,
+                    nonlin="relu",
                 ),
                 "CFRNet_0.001": cate_models.torch.TARNet(
                     X_train.shape[1],
@@ -413,19 +406,31 @@ class PropensitySensitivity:
                     nonlin="relu",
                     penalty_disc=0.001,
                 ),
-                "SNet": cate_models.torch.SNet(
+                "CFRNet_0.01": cate_models.torch.TARNet(
                     X_train.shape[1],
                     binary_y=(len(np.unique(Y_train)) == 2),
                     n_layers_r=1,
                     n_layers_out=1,
                     n_units_out=100,
-                    n_units_r=50,
-                    n_units_r_small=50,
+                    n_units_r=100,
                     batch_size=1024,
                     n_iter=self.n_iter,
                     batch_norm=False,
-                    penalty_orthogonal=0.01,
                     nonlin="relu",
+                    penalty_disc=0.01,
+                ),
+                "CFRNet_0.1": cate_models.torch.TARNet(
+                    X_train.shape[1],
+                    binary_y=(len(np.unique(Y_train)) == 2),
+                    n_layers_r=1,
+                    n_layers_out=1,
+                    n_units_out=100,
+                    n_units_r=100,
+                    batch_size=1024,
+                    n_iter=self.n_iter,
+                    batch_norm=False,
+                    nonlin="relu",
+                    penalty_disc=0.1,
                 ),
             }
 
@@ -455,11 +460,9 @@ class PropensitySensitivity:
                     )
                     acc_scores_predictive_features = attribution_accuracy(pred_features, attribution_est)
                     acc_scores_prog_features = attribution_accuracy(prog_features, attribution_est)
-                    _, mu0_pred, mu1_pred = learners[learner_name].predict(X=X_test, return_po=True)
 
-                    pehe_test, factual_rmse_test = compute_cate_metrics(cate_true=cate_test, y_true=Y_test,
-                                                                        w_true=W_test,
-                                                                        mu0_pred=mu0_pred, mu1_pred=mu1_pred)
+                    cate_pred = learners[learner_name].predict(X=X_test)
+                    pehe_test = compute_pehe(cate_true=cate_test, cate_pred=cate_pred)
 
                     explainability_data.append(
                         [
@@ -470,7 +473,6 @@ class PropensitySensitivity:
                             acc_scores_predictive_features,
                             acc_scores_prog_features,
                             pehe_test,
-                            factual_rmse_test,
                             np.mean(cate_test),
                             np.var(cate_test),
                             pehe_test / np.sqrt(np.var(cate_test))
@@ -487,7 +489,6 @@ class PropensitySensitivity:
                 "Pred features ACC",
                 "Prog features ACC",
                 "PEHE",
-                "Factual RMSE",
                 "CATE true mean",
                 "CATE true var",
                 "Normalized PEHE",
@@ -595,34 +596,6 @@ class NonLinearitySensitivity:
                     batch_size=1024,
                     n_iter=self.n_iter,
                     batch_norm=False,
-                    nonlin="relu",
-                ),
-                "SNet": cate_models.torch.SNet(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_r=1,
-                    n_layers_out=1,
-                    n_units_out=100,
-                    n_units_r=50,
-                    n_units_r_small=50,
-                    batch_size=1024,
-                    n_iter=self.n_iter,
-                    batch_norm=False,
-                    penalty_orthogonal=0.01,
-                    nonlin="relu",
-                ),
-                "SNet_0.00": cate_models.torch.SNet(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_r=1,
-                    n_layers_out=1,
-                    n_units_out=100,
-                    n_units_r=50,
-                    n_units_r_small=50,
-                    batch_size=1024,
-                    n_iter=self.n_iter,
-                    batch_norm=False,
-                    penalty_orthogonal=0.00,
                     nonlin="relu",
                 ),
                 "DRLearner": cate_models.torch.DRLearner(
