@@ -12,7 +12,7 @@ from matplotlib.lines import Line2D
 from sklearn.metrics import mean_squared_error
 from torch import nn
 
-import iterpretability.simulate
+#import src.iterpretability.simulate
 
 abbrev_dict = {
     "shapley_value_sampling": "SVS",
@@ -41,10 +41,11 @@ learner_colors = {
     "TLearner": cblind_palete[1],
     "SNet": cblind_palete[2],
     "TARNet": cblind_palete[3],
-    "CFRNet": cblind_palete[4],
+    "CFRNet_0.01": cblind_palete[4],
     "SNet_noprop": cblind_palete[5],
     "CFRNet_0.001": cblind_palete[6],
     "CFRNet_0.0001": cblind_palete[7],
+    "CFRNet_0.1": cblind_palete[7],
     "DRLearner": cblind_palete[8],
     "RALearner": cblind_palete[9],
     "XLearner": cblind_palete[5],

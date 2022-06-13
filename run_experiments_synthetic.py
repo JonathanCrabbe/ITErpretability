@@ -14,7 +14,8 @@ def init_arg() -> Any:
     parser.add_argument("--train_ratio", default=0.8, type=float)
 
     # Arguments for Predictive Sensitivity Experiment
-    parser.add_argument("--synthetic_simulator_type", default='linear', type=str)
+    parser.add_argument("--synthetic_simulator_type", default='nonlinear', type=str)
+
     #parser.add_argument("--synthetic_simulator_type", default='random', type=str)
     parser.add_argument("--random_feature_selection", default=True, type=bool)
 
@@ -39,14 +40,14 @@ def init_arg() -> Any:
         default=[False, False, False, False, False, False],
     )
 
-    parser.add_argument("--propensity_types", default=["pred", "prog", "irrelevant_var"], type=str, nargs="+")
+    parser.add_argument("--propensity_types", default=["prog", "irrelevant_var"], type=str, nargs="+")
 
     # Arguments for Propensity Sensitivity Experiment
     parser.add_argument("--predictive_scale", default=1.0, type=float)
     parser.add_argument(
-        "--seed_list", nargs="+", default=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+        "--seed_list", nargs="+", default=[3, 4, 5, 6, 7, 8, 9, 10,
                                            11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-                                           21, 22, 23, 24, 25, 26, 27, 28, 29, 30, ], type=int
+                                           21, 22, 23, 24, 25, 26, 27, 28, 29, 30,], type=int
     )
     parser.add_argument(
         "--explainer_list",

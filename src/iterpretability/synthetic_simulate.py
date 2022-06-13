@@ -76,6 +76,9 @@ class SyntheticSimulatorBase:
         self.prop_scale = prop_scale
         self.addvar_scale = addvar_scale
 
+        print ("Err std")
+        print (err_std)
+
         prog, pred0, pred1 = self.predict(X)
 
         self.top_idx = None
@@ -116,7 +119,7 @@ class SyntheticSimulatorBase:
             raise ValueError(
                 f"{treatment_assign} is not a valid treatment assignment mechanism."
             )
-
+        print (propensity)
         W_synth = np.random.binomial(1, p=propensity)
 
         po0 = self.scale_factor * (prog + self.predictive_scale * pred0)
