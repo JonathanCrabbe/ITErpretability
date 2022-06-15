@@ -32,3 +32,4 @@ python run_experiments.py --experiment_name=propensity_sensitivity
 
 The results from all experiments are saved in results/. You can then plot the results by running the code in the notebook plot_results.ipynb. 
 
+Note that we use the PyTorch implementations of the different CATE learners from the catenets Python package: https://github.com/AliciaCurth/CATENets.
