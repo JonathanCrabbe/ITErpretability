@@ -32,7 +32,7 @@ def init_arg() -> Any:
         "--binary_outcome_list",
         nargs="+",
         type=bool,
-        default=[False, False, False, False, False],
+        default=[False, False, False, False],
     )
 
     parser.add_argument("--propensity_types", default=["pred", "prog", "irrelevant_var"], type=str, nargs="+")
@@ -120,7 +120,6 @@ if __name__ == "__main__":
                         dataset=args.dataset_list[experiment_id],
                         train_ratio=args.train_ratio,
                         num_important_features=args.num_important_features_list[experiment_id],
-                        random_feature_selection=args.random_feature_selection,
                         binary_outcome=args.binary_outcome_list[experiment_id],
                         explainer_list=args.explainer_list,
                         predictive_scale=args.predictive_scale,

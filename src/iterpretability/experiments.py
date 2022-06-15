@@ -55,7 +55,7 @@ class PredictiveSensitivity:
         train_ratio: float = 0.8,
         num_important_features: int = 2,
         binary_outcome: bool = False,
-        random_feature_selection: bool = False,
+        random_feature_selection: bool = True,
         explainer_list: list = ["feature_ablation", "feature_permutation", "integrated_gradients",
                                 "shapley_value_sampling"],
     ) -> None:
