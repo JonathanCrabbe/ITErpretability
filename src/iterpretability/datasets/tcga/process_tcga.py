@@ -60,4 +60,4 @@ def process_tcga(max_num_genes):
 
 
 if __name__ == "__main__":
-    process_tcga(max_num_genes=10)
+    process_tcga(max_num_genes=100)

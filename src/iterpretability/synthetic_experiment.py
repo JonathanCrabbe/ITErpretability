@@ -1,31 +1,18 @@
-import copy
-import csv
-from functools import reduce
 from pathlib import Path
-from typing import Any, Tuple
 
 import catenets.models as cate_models
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from sklearn.metrics import mean_squared_error
 
 import src.iterpretability.logger as log
 from src.iterpretability.explain import Explainer
 from src.iterpretability.datasets.data_loader import load
 from src.iterpretability.synthetic_simulate import (
     SyntheticSimulatorLinear,
-    SyntheticSimulatorLinearCorrelations,
-    SyntheticSimulatorLinearPairwise,
-    SyntheticSimulatorNonLinear,
-    SyntheticSimulatorNonLinearCorrelations,
     SyntheticSimulatorModulatedNonLinear,
 )
 from src.iterpretability.utils import (
     attribution_accuracy,
-    compute_cate_metrics,
-    dataframe_line_plot,
     compute_pehe,
 )
 
@@ -79,11 +66,6 @@ class PredictiveSensitivity:
         if self.synthetic_simulator_type == 'linear':
             sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
                                            random_feature_selection=random_feature_selection, seed=self.seed)
-
-        elif self.synthetic_simulator_type == 'nonlinear':
-            sim = SyntheticSimulatorNonLinear(X_raw_train, num_important_features=num_important_features,
-                                              random_feature_selection=random_feature_selection, seed=self.seed)
-
         else:
             raise Exception('Unknown simulator type.')
 
@@ -143,16 +125,6 @@ class PredictiveSensitivity:
                     batch_norm=False,
                     nonlin="relu",
                 ),
-                "RALearner": cate_models.torch.RALearner(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_out=2,
-                    n_units_out=100,
-                    n_iter=self.n_iter,
-                    batch_size=1024,
-                    batch_norm=False,
-                    nonlin="relu",
-                ),
                 "XLearner": cate_models.torch.XLearner(
                     X_train.shape[1],
                     binary_y=(len(np.unique(Y_train)) == 2),
@@ -170,12 +142,14 @@ class PredictiveSensitivity:
             learner_explanations = {}
 
             for name in learners:
+                log.info(f"Fitting {name}.")
                 learners[name].fit(X=X_train, y=Y_train, w=W_train)
                 learner_explainers[name] = Explainer(
                     learners[name],
                     feature_names=list(range(X_train.shape[1])),
                     explainer_list=explainer_list,
                 )
+                log.info(f"Explaining {name}.")
                 learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
 
             all_important_features = sim.get_all_important_features()
@@ -240,7 +214,7 @@ class PredictiveSensitivity:
 
 class NonLinearitySensitivity:
     """
-    Sensitivity analysis for nonlinearity in prognostic and predictive functions
+    Sensitivity analysis for nonlinearity in prognostic and predictive functions.
     """
 
     def __init__(
@@ -337,16 +311,6 @@ class NonLinearitySensitivity:
                     batch_norm=False,
                     nonlin="relu",
                 ),
-                "RALearner": cate_models.torch.RALearner(
-                    X_train.shape[1],
-                    binary_y=(len(np.unique(Y_train)) == 2),
-                    n_layers_out=2,
-                    n_units_out=100,
-                    n_iter=self.n_iter,
-                    batch_size=1024,
-                    batch_norm=False,
-                    nonlin="relu",
-                ),
                 "XLearner": cate_models.torch.XLearner(
                     X_train.shape[1],
                     binary_y=(len(np.unique(Y_train)) == 2),
@@ -434,7 +398,7 @@ class NonLinearitySensitivity:
 
 class PropensitySensitivity:
     """
-    Sensitivity analysis for Confounding
+    Sensitivity analysis for confounding.
     """
 
     def __init__(
@@ -448,7 +412,7 @@ class PropensitySensitivity:
         explainer_limit: int = 1000,
         save_path: Path = Path.cwd(),
         num_interactions: int = 1,
-        synthetic_simulator_type: str = 'nonlinear',
+        synthetic_simulator_type: str = 'linear',
         propensity_type: str = 'pred',
         propensity_scales: list = [0, 0.5, 1, 2, 5, 10]
     ) -> None:
@@ -482,7 +446,6 @@ class PropensitySensitivity:
             f"Using dataset {dataset} with num_important features = {num_important_features} and predictive scale {predictive_scale}.")
 
         X_raw_train, X_raw_test = load(dataset, train_ratio=train_ratio)
-        print (X_raw_train.shape)
 
         if self.synthetic_simulator_type == 'linear':
             sim = SyntheticSimulatorLinear(X_raw_train, num_important_features=num_important_features,
@@ -615,7 +578,6 @@ class PropensitySensitivity:
                     feature_names=list(range(X_train.shape[1])),
                     explainer_list=explainer_list,
                 )
-                print (self.explainer_limit)
                 learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
 
             all_important_features = sim.get_all_important_features()

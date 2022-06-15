@@ -3,7 +3,7 @@ import sys
 from typing import Any
 
 import src.iterpretability.logger as log
-from src.iterpretability.synthetic_experiment import (PredictiveSensitivity, PairwiseInteractionSensitivity,
+from src.iterpretability.synthetic_experiment import (PredictiveSensitivity,
                                                       PropensitySensitivity,
                                                       NonLinearitySensitivity)
 
@@ -12,40 +12,35 @@ def init_arg() -> Any:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment_name", default="propensity_sensitivity", type=str)
     parser.add_argument("--train_ratio", default=0.8, type=float)
-
-    # Arguments for Predictive Sensitivity Experiment
-    parser.add_argument("--synthetic_simulator_type", default='nonlinear', type=str)
-
-    #parser.add_argument("--synthetic_simulator_type", default='random', type=str)
-    parser.add_argument("--random_feature_selection", default=True, type=bool)
+    parser.add_argument("--synthetic_simulator_type", default='linear', type=str)
 
     parser.add_argument(
         "--dataset_list",
         nargs="+",
         type=str,
-        default=["twins", "acic", "tcga_20", "tcga_100", "news_100"],
+        default=["twins", "acic", "tcga_100", "news_100"],
     )
 
     parser.add_argument(
         "--num_important_features_list",
         nargs="+",
         type=int,
-        default=[8, 10, 4, 20, 20],
+        default=[8, 10, 20, 20],
     )
 
     parser.add_argument(
         "--binary_outcome_list",
         nargs="+",
         type=bool,
-        default=[False, False, False, False, False, False],
+        default=[False, False, False, False, False],
     )
 
-    parser.add_argument("--propensity_types", default=["prog", "irrelevant_var"], type=str, nargs="+")
+    parser.add_argument("--propensity_types", default=["pred", "prog", "irrelevant_var"], type=str, nargs="+")
 
     # Arguments for Propensity Sensitivity Experiment
     parser.add_argument("--predictive_scale", default=1.0, type=float)
     parser.add_argument(
-        "--seed_list", nargs="+", default=[3, 4, 5, 6, 7, 8, 9, 10,
+        "--seed_list", nargs="+", default=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
                                            11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                                            21, 22, 23, 24, 25, 26, 27, 28, 29, 30,], type=int
     )
@@ -84,35 +79,14 @@ if __name__ == "__main__":
                     dataset=args.dataset_list[experiment_id],
                     train_ratio=args.train_ratio,
                     num_important_features=args.num_important_features_list[experiment_id],
-                    random_feature_selection=args.random_feature_selection,
                     binary_outcome=args.binary_outcome_list[experiment_id],
                     explainer_list=args.explainer_list,
                 )
-        elif args.experiment_name == "interaction_sensitivity":
-            exp = PairwiseInteractionSensitivity(
-                seed=seed,
-                explainer_limit=args.explainer_limit,
-                synthetic_simulator_type=args.synthetic_simulator_type
-            )
-            for experiment_id in range(len(args.dataset_list)):
-                log.info(
-                    f"Running experiment for {args.dataset_list[experiment_id]}, "
-                    f"{args.num_important_features_list[experiment_id]} important features "
-                    f"with binary outcome {args.binary_outcome_list[experiment_id]}")
 
-                exp.run(
-                    dataset=args.dataset_list[experiment_id],
-                    train_ratio=args.train_ratio,
-                    num_important_features=args.num_important_features_list[experiment_id],
-                    binary_outcome=args.binary_outcome_list[experiment_id],
-                    explainer_list=args.explainer_list,
-                )
         elif args.experiment_name == "nonlinearity_sensitivity":
             exp = NonLinearitySensitivity(
                 seed=seed,
-                explainer_limit=args.explainer_limit,
-                synthetic_simulator_type=args.synthetic_simulator_type
-            )
+                explainer_limit=args.explainer_limit)
             for experiment_id in range(len(args.dataset_list)):
                 log.info(
                     f"Running experiment for {args.dataset_list[experiment_id]}, "
