@@ -132,7 +132,5 @@ dmypy.json
 .idea/
 
 # Figures
-src/iterpretability/figures
-figures/
 src/iterpretability/results/
 results/
