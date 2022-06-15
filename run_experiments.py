@@ -3,9 +3,9 @@ import sys
 from typing import Any
 
 import src.iterpretability.logger as log
-from src.iterpretability.synthetic_experiment import (PredictiveSensitivity,
-                                                      PropensitySensitivity,
-                                                      NonLinearitySensitivity)
+from src.iterpretability.experiments import (PredictiveSensitivity,
+                                             PropensitySensitivity,
+                                             NonLinearitySensitivity)
 
 
 def init_arg() -> Any:

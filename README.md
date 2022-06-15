@@ -15,19 +15,19 @@ You can run the experiments using the following commands:
 - Experiment 1: Altering the Strength of Predictive Effects
 
 ```bash
-python run_experiments_synthetic.py --experiment_name=predictive_sensitivity
+python run_experiments.py --experiment_name=predictive_sensitivity
 ```
 
 - Experiment 2: Incorporating Nonlinearities
 
 ```bash
-python run_experiments_synthetic.py --experiment_name=nonlinearity_sensitivity
+python run_experiments.py --experiment_name=nonlinearity_sensitivity
 ```
 
 - Experiment 3: The Effect of Confounding
 
 ```bash
-python run_experiments_synthetic.py --experiment_name=propensity_sensitivity
+python run_experiments.py --experiment_name=propensity_sensitivity
 ```
 
 The results from all experiments are saved in results/. You can then plot the results by running the code in the notebook plot_results.ipynb. 

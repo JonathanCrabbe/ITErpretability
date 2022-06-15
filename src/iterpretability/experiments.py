@@ -327,12 +327,14 @@ class NonLinearitySensitivity:
             learner_explanations = {}
 
             for name in learners:
+                log.info(f"Fitting {name}.")
                 learners[name].fit(X=X_train, y=Y_train, w=W_train)
                 learner_explainers[name] = Explainer(
                     learners[name],
                     feature_names=list(range(X_train.shape[1])),
                     explainer_list=explainer_list,
                 )
+                log.info(f"Explaining {name}.")
                 learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
 
             all_important_features = sim.get_all_important_features()
@@ -572,12 +574,14 @@ class PropensitySensitivity:
             learner_explanations = {}
 
             for name in learners:
+                log.info(f"Fitting {name}.")
                 learners[name].fit(X=X_train, y=Y_train, w=W_train)
                 learner_explainers[name] = Explainer(
                     learners[name],
                     feature_names=list(range(X_train.shape[1])),
                     explainer_list=explainer_list,
                 )
+                log.info(f"Explaining {name}.")
                 learner_explanations[name] = learner_explainers[name].explain(X_test[:self.explainer_limit])
 
             all_important_features = sim.get_all_important_features()
