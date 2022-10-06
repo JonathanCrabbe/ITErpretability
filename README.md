@@ -1,99 +1,58 @@
 # ITErpretability
-Explainability in the CATE setting
+Explainability in the CATE setting.
 
 
 ## Installation
 
 ```bash
 pip install -r requirements.txt
-pip install .
 ```
 
-## Tests
+## Running experiments 
 
-You can run the tests using
+You can run the experiments using the following commands: 
+
+- Experiment 1: Altering the Strength of Predictive Effects
 
 ```bash
-pip install -r requirements_dev.txt
-
-pytest -vsx
+python run_experiments.py --experiment_name=predictive_sensitivity
 ```
 
-## Usage examples
+- Experiment 2: Incorporating Nonlinearities
 
-### 1. Generate a new dataset starting from the Twins dataset
-
-```python
-from catenets.datasets import load
-from iterpretability import Simulator
-
-X_raw, T_raw, Y_raw, _, _, _ = load("twins")
-
-sim = Simulator(X_raw, T_raw, Y_raw, n_iter=10)
-
-X, W, Y, prog, po0, po1, _ = sim.simulate_dataset(X_raw)
-
-```
-### 2. Generate feature importance for a learner
-
-```python
-import numpy as np
-from catenets.datasets import load
-from catenets.models.torch import TLearner
-
-from iterpretability import Explainer
-
-X_train, W_train, Y_train, Y_train_full, X_test, Y_test = load("twins")
-W_train = W_train.ravel()
-Y_train = Y_train.ravel()
-
-learner = TLearner(
-    X_train.shape[1], binary_y=(len(np.unique(Y_train)) == 2), n_iter=100
-)
-learner.fit(X=X_train, y=Y_train, w=W_train)
-explainer = Explainer(learner, feature_names=list(range(X_train.shape[1])))
-
-explanations = explainer.explain(X_test[:2])
-explanations
+```bash
+python run_experiments.py --experiment_name=nonlinearity_sensitivity
 ```
 
-### 3. Hyperparameter search for the DGP
+- Experiment 3: The Effect of Confounding
 
-```python
-from catenets.datasets import load
-from iterpretability.hyperparam_search import search
-
-X_raw, T_raw, Y_raw, Y_full_raw, _, _ = load("ihdp")
-best_params = search(X_raw, T_raw, Y_raw, Y_full_raw, n_trials=5)
-
-best_params
+```bash
+python run_experiments.py --experiment_name=propensity_sensitivity
 ```
-### 4. Generate prognostic, predictive and learner explanations
 
-```python
-import numpy as np
+The results from all experiments are saved in results/. You can then plot the results by running the code in the notebook plot_results.ipynb. 
 
-from catenets.datasets import load
-import catenets.models as cate_models
+Note that we use the PyTorch implementations of the different CATE learners from the catenets Python package: https://github.com/AliciaCurth/CATENets.
 
-from iterpretability import Experiment
+## Adding datasets 
 
-X_raw, T_raw, Y_raw, Y_full_raw, _, _ = load("ihdp")
+Our code can be easily extended to add more datasets for evaluation. To add a new dataset, you need to update the 
+load() function in src/interpretability/data_loader.py to read the features (X_raw) for the new dataset from the 
+dataset file. X_raw needs to have shape [N_d, D_f], where N_d is the number of examples in the dataset and D_f is the 
+number of features for each example. 
 
-learners = {
-    "SLearner": cate_models.torch.SLearner(
-        X_raw.shape[1],
-        binary_y=(len(np.unique(Y_raw)) == 2),
-        nonlin="selu",
-        n_iter=100,
-    )
-}
-ctx = Experiment(learners)
+The experiments have set as default arguments the datasets and the number of important features for each dataset used 
+for the results in the paper. To run the experiments with your new dataset, you just need to pass it as a command line 
+argument. For instance, to run the predictive_sensitivity with a new dataset named 'new_dataset_name' with N_i predictive 
+(for each potential outcome) and prognostic features, you can use: 
 
-(
-    prognostic_explanations,
-    predictive_explanations,
-    learner_explanations,
-    learner_po_explanations,
-) = ctx.run(X_raw, T_raw, Y_raw, explainer_limit=2, n_iter=10)
+```bash
+python run_experiments.py --experiment_name='predictive_sensitivity' --dataset_name='new_dataset_name' --num_important_features_list='N_I'
 ```
+
+## Adding learners 
+The code can also be easily used with additional CATE learners. We currently use the PyTorch implementations of the different CATE learners from the 
+catenets Python package: https://github.com/AliciaCurth/CATENets. However, if you want to evaluate the ability of new/other CATE learners
+to discover predictive features for CATE estimation, you can add it to the learners list in src/interpretability/experiments.py. 
+The CATE learner needs to be implemented as a Python Class that inherits the BaseCATEEstimator in the CATENets package: https://github.com/AliciaCurth/CATENets/blob/main/catenets/models/torch/base.py#L514
+
