@@ -46,23 +46,6 @@ def init_arg() -> Any:
 
     # Arguments for Propensity Sensitivity Experiment
     parser.add_argument("--predictive_scale", default=1.0, type=float)
-    # parser.add_argument(
-    #     "--seed_list",
-    #     nargs="+",
-    #     default=[
-    #         1,
-    #         2,
-    #         3,
-    #         4,
-    #         5,
-    #         6,
-    #         7,
-    #         8,
-    #         9,
-    #         10,
-    #     ],
-    #     type=int,
-    # )
     parser.add_argument(
         "--seed_list",
         nargs="+",
