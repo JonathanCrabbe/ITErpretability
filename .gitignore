@@ -134,3 +134,6 @@ dmypy.json
 # Figures
 src/iterpretability/results/
 results/
+
+# Data
+x_trans.csv
