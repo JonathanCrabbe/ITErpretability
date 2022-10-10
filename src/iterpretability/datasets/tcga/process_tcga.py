@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import pickle
@@ -33,9 +34,11 @@ def normalize_data(X):
     return X_normalized
 
 
-def process_tcga(max_num_genes):
+def process_tcga(max_num_genes, file_location=""):
     try:
-        tcga_dataset = pickle.load(open("tcga_full_dataset.p", "rb"))
+        tcga_dataset = pickle.load(
+            open(os.path.join(file_location, "tcga_full_dataset.p"), "rb")
+        )
     except:
         raise FileNotFoundError(
             "Full TCGA dataset needs to be downloaded from: https://drive.google.com/file/d/1NveePKQscxJ-VZacOm9MHEAVvPKOQJW8/view?usp=sharing"
@@ -66,7 +69,10 @@ def process_tcga(max_num_genes):
     # Normalize data to [0, 1]
     tcga_dataset["rnaseq"] = normalize_data(filtered_gene_data.values)
 
-    pickle.dump(tcga_dataset, open("tcga_" + str(max_num_genes) + ".p", "wb"))
+    pickle.dump(
+        tcga_dataset,
+        open(os.path.join(file_location, "tcga_" + str(max_num_genes) + ".p"), "wb"),
+    )
 
 
 if __name__ == "__main__":

@@ -136,4 +136,6 @@ src/iterpretability/results/
 results/
 
 # Data
-x_trans.csv
+catenets/datasets/data/x_trans.csv
+src/iterpretability/datasets/*/*.p
+src/iterpretability/datasets/news/docword.nytimes.txt

@@ -1,17 +1,47 @@
 import pickle
 from catenets.datasets import load as catenets_load
+from src.iterpretability.datasets.news.process_news import process_news
+from src.iterpretability.datasets.tcga.process_tcga import process_tcga
 
 
 def load(dataset_name: str, train_ratio: float = 1.0):
     if "tcga" in dataset_name:
-        tcga_dataset = pickle.load(
-            open("src/iterpretability/datasets/tcga/" + str(dataset_name) + ".p", "rb")
-        )
+        try:
+            tcga_dataset = pickle.load(
+                open(
+                    "src/iterpretability/datasets/tcga/" + str(dataset_name) + ".p",
+                    "rb",
+                )
+            )
+        except:
+            process_tcga(
+                max_num_genes=100, file_location="src/iterpretability/datasets/tcga/"
+            )
+            tcga_dataset = pickle.load(
+                open(
+                    "src/iterpretability/datasets/tcga/" + str(dataset_name) + ".p",
+                    "rb",
+                )
+            )
         X_raw = tcga_dataset["rnaseq"]
     elif "news" in dataset_name:
-        news_dataset = pickle.load(
-            open("src/iterpretability/datasets/news/" + str(dataset_name) + ".p", "rb")
-        )
+        try:
+            news_dataset = pickle.load(
+                open(
+                    "src/iterpretability/datasets/news/" + str(dataset_name) + ".p",
+                    "rb",
+                )
+            )
+        except:
+            process_news(
+                max_num_features=100, file_location="src/iterpretability/datasets/news/"
+            )
+            news_dataset = pickle.load(
+                open(
+                    "src/iterpretability/datasets/news/" + str(dataset_name) + ".p",
+                    "rb",
+                )
+            )
         X_raw = news_dataset
     elif "twins" in dataset_name:
         # Total features  = 39
