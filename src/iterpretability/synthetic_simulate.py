@@ -31,7 +31,9 @@ class SyntheticSimulatorBase:
         self.prog_mask, self.pred0_mask, self.pred1_mask = None, None, None
         self.prog_weights, self.pred0_weights, self.pred1_weights = None, None, None
 
-    def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
+    def get_important_features(
+        self, X: np.ndarray, num_important_features: int
+    ) -> Tuple:
         raise NotImplementedError
 
     def predict(self, X: np.ndarray) -> Tuple:
@@ -47,7 +49,7 @@ class SyntheticSimulatorBase:
         err_std: float = 0.1,
         prop_scale: float = 1,
         addvar_scale: float = 0.1,
-        binary_outcome: bool = False
+        binary_outcome: bool = False,
     ) -> Tuple:
         enable_reproducible_results(self.seed)
         self.scale_factor = scale_factor
@@ -83,9 +85,7 @@ class SyntheticSimulatorBase:
             )
             propensity = expit(self.prop_scale * exponent)
         elif self.treatment_assign == "irrelevant_var":
-            all_act = (
-                self.prog_weights + self.pred1_weights + self.pred0_weights
-            )
+            all_act = self.prog_weights + self.pred1_weights + self.pred0_weights
             top_idx = np.argmin(np.abs(all_act))  # chooses an index with 0 weight
             self.top_idx = top_idx
 
@@ -107,11 +107,11 @@ class SyntheticSimulatorBase:
         if self.noise:
             error = (
                 torch.empty(len(X))
-                    .normal_(std=self.err_std)
-                    .squeeze()
-                    .detach()
-                    .cpu()
-                    .numpy()
+                .normal_(std=self.err_std)
+                .squeeze()
+                .detach()
+                .cpu()
+                .numpy()
             )
 
         Y_synth = W_synth * po1 + (1 - W_synth) * po0 + error
@@ -125,8 +125,7 @@ class SyntheticSimulatorBase:
     def po0(self, X: np.ndarray) -> np.ndarray:
         prog_factor, pred0_factor, _ = self.predict(X)
 
-        po0 = self.scale_factor * (
-            prog_factor + self.predictive_scale * pred0_factor)
+        po0 = self.scale_factor * (prog_factor + self.predictive_scale * pred0_factor)
         return po0
 
     def po1(self, X: np.ndarray) -> np.ndarray:
@@ -148,12 +147,16 @@ class SyntheticSimulatorBase:
         return self.scale_factor * prog_factor
 
     def get_all_important_features(self) -> np.ndarray:
-        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
+        all_important_features = np.union1d(
+            self.get_predictive_features(), self.get_prognostic_features()
+        )
         return all_important_features
 
     def get_predictive_features(self) -> np.ndarray:
-        pred_features = np.union1d(np.where((self.pred0_mask).astype(np.int32) != 0)[0],
-                                   np.where((self.pred1_mask).astype(np.int32) != 0)[0])
+        pred_features = np.union1d(
+            np.where((self.pred0_mask).astype(np.int32) != 0)[0],
+            np.where((self.pred1_mask).astype(np.int32) != 0)[0],
+        )
 
         return pred_features
 
@@ -191,14 +194,23 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
     ) -> None:
         super(SyntheticSimulatorLinear, self).__init__(seed=seed)
 
-        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features,
-                                                                                       random_feature_selection)
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(
+            X, num_important_features, random_feature_selection
+        )
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
-        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
-        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+        self.pred0_weights = (
+            np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        )
+        self.pred1_weights = (
+            np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+        )
 
-    def get_important_features(self, X: np.ndarray, num_important_features: int,
-                               random_feature_selection: bool = True) -> Tuple:
+    def get_important_features(
+        self,
+        X: np.ndarray,
+        num_important_features: int,
+        random_feature_selection: bool = True,
+    ) -> Tuple:
         assert num_important_features <= int(X.shape[1] / 3)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
@@ -209,8 +221,12 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
             np.random.shuffle(all_indices)
 
         prog_indices = all_indices[:num_important_features]
-        pred0_indices = all_indices[num_important_features:(2 * num_important_features)]
-        pred1_indices = all_indices[(2 * num_important_features):(3 * num_important_features)]
+        pred0_indices = all_indices[
+            num_important_features : (2 * num_important_features)
+        ]
+        pred1_indices = all_indices[
+            (2 * num_important_features) : (3 * num_important_features)
+        ]
 
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
@@ -248,15 +264,15 @@ class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
 
     nonlinearities = [
         lambda x: np.abs(x),
-        lambda x: np.exp(-(x ** 2) / 2),
-        lambda x: 1 / (1 + x ** 2),
+        lambda x: np.exp(-(x**2) / 2),
+        lambda x: 1 / (1 + x**2),
         lambda x: np.cos(x),
         lambda x: np.arctan(x),
         lambda x: np.tanh(x),
         lambda x: np.sin(x),
-        lambda x: np.log(1 + x ** 2),
-        lambda x: np.sqrt(1 + x ** 2),
-        lambda x: np.cosh(x)
+        lambda x: np.log(1 + x**2),
+        lambda x: np.sqrt(1 + x**2),
+        lambda x: np.cosh(x),
     ]
 
     def __init__(
@@ -272,26 +288,46 @@ class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
         assert 0 <= non_linearity_scale <= 1
         self.selection_type = selection_type
         self.non_linearity_scale = non_linearity_scale
-        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(X, num_important_features)
+        self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(
+            X, num_important_features
+        )
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
-        self.pred0_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
-        self.pred1_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
-        self.prog_nonlin, self.pred0_nonlin, self.pred1_nonlin = self.sample_nonlinearities()
+        self.pred0_weights = (
+            np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred0_mask
+        )
+        self.pred1_weights = (
+            np.random.uniform(-1, 1, size=(X.shape[1])) * self.pred1_mask
+        )
+        (
+            self.prog_nonlin,
+            self.pred0_nonlin,
+            self.pred1_nonlin,
+        ) = self.sample_nonlinearities()
 
-    def get_important_features(self, X: np.ndarray, num_important_features: int) -> Tuple:
+    def get_important_features(
+        self, X: np.ndarray, num_important_features: int
+    ) -> Tuple:
         assert 3 * num_important_features <= int(X.shape[1])
         np.random.seed(self.seed)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
-        prog_indices, pred0_indices, pred1_indices = np.empty(shape=0), np.empty(shape=0), np.empty(shape=0)
+        prog_indices, pred0_indices, pred1_indices = (
+            np.empty(shape=0),
+            np.empty(shape=0),
+            np.empty(shape=0),
+        )
 
         if self.selection_type == "random":
             all_indices = np.array(range(X.shape[1]))
             np.random.shuffle(all_indices)
             prog_indices = all_indices[:num_important_features]
-            pred0_indices = all_indices[num_important_features:2 * num_important_features]
-            pred1_indices = all_indices[2 * num_important_features:3 * num_important_features]
+            pred0_indices = all_indices[
+                num_important_features : 2 * num_important_features
+            ]
+            pred1_indices = all_indices[
+                2 * num_important_features : 3 * num_important_features
+            ]
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
         pred1_mask[pred1_indices] = 1
@@ -301,17 +337,27 @@ class SyntheticSimulatorModulatedNonLinear(SyntheticSimulatorBase):
         prog_lin = np.dot(X, self.prog_weights)
         pred0_lin = np.dot(X, self.pred0_weights)
         pred1_lin = np.dot(X, self.pred1_weights)
-        prog = (1 - self.non_linearity_scale) * prog_lin + self.non_linearity_scale * self.prog_nonlin(prog_lin)
-        pred0 = (1 - self.non_linearity_scale) * pred0_lin + self.non_linearity_scale * self.pred0_nonlin(pred0_lin)
-        pred1 = (1 - self.non_linearity_scale) * pred1_lin + self.non_linearity_scale * self.pred1_nonlin(pred1_lin)
+        prog = (
+            1 - self.non_linearity_scale
+        ) * prog_lin + self.non_linearity_scale * self.prog_nonlin(prog_lin)
+        pred0 = (
+            1 - self.non_linearity_scale
+        ) * pred0_lin + self.non_linearity_scale * self.pred0_nonlin(pred0_lin)
+        pred1 = (
+            1 - self.non_linearity_scale
+        ) * pred1_lin + self.non_linearity_scale * self.pred1_nonlin(pred1_lin)
         return prog, pred0, pred1
 
     def get_all_important_features(self) -> np.ndarray:
-        all_important_features = np.union1d(self.get_predictive_features(), self.get_prognostic_features())
+        all_important_features = np.union1d(
+            self.get_predictive_features(), self.get_prognostic_features()
+        )
         return all_important_features
 
     def get_predictive_features(self) -> np.ndarray:
-        pred_features = np.where((self.pred0_mask + self.pred1_mask).astype(np.int32) != 0)[0]
+        pred_features = np.where(
+            (self.pred0_mask + self.pred1_mask).astype(np.int32) != 0
+        )[0]
         return pred_features
 
     def get_prognostic_features(self) -> np.ndarray:
