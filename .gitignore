@@ -138,4 +138,5 @@ results/
 # Data
 catenets/datasets/data/x_trans.csv
 src/iterpretability/datasets/*/*.p
+src/iterpretability/datasets/*/*_100.p
 src/iterpretability/datasets/news/docword.nytimes.txt
