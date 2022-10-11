@@ -12,7 +12,7 @@ from captum.attr import (
     KernelShap,
     Lime,
     ShapleyValueSampling,
-    GradientShap
+    GradientShap,
 )
 from captum.attr._core.lime import get_exp_kernel_similarity_function
 from torch import nn
@@ -42,7 +42,7 @@ class Explainer:
         perturbations_per_eval: int = 10,
         n_samples: int = 1000,
         kernel_width: float = 1.0,
-        baseline: Optional[torch.Tensor] = None
+        baseline: Optional[torch.Tensor] = None,
     ) -> None:
         self.baseline = baseline
         self.explainer_list = explainer_list
@@ -141,7 +141,9 @@ class Explainer:
     def explain(self, X: torch.Tensor) -> Dict:
         output = {}
         if self.baseline is None:
-            self.baseline = torch.zeros(X.shape)  # Zero tensor as baseline if no baseline specified
+            self.baseline = torch.zeros(
+                X.shape
+            )  # Zero tensor as baseline if no baseline specified
         for name in self.explainer_list:
             X_test = self._check_tensor(X)
             self.baseline = self._check_tensor(self.baseline)

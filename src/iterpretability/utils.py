@@ -59,15 +59,16 @@ def enable_reproducible_results(seed: int = 42) -> None:
     torch.manual_seed(seed)
     random.seed(seed)
 
+
 def dataframe_line_plot(
-        df: pd.DataFrame,
-        x_axis: str,
-        y_axis: str,
-        explainers: list,
-        learners: list,
-        x_logscale: bool = True,
-        aggregate: bool = False,
-        aggregate_type: str = 'mean'
+    df: pd.DataFrame,
+    x_axis: str,
+    y_axis: str,
+    explainers: list,
+    learners: list,
+    x_logscale: bool = True,
+    aggregate: bool = False,
+    aggregate_type: str = "mean",
 ) -> plt.Figure:
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -76,7 +77,7 @@ def dataframe_line_plot(
         for explainer_name in explainers:
             sub_df = df.loc[
                 (df["Learner"] == learner_name) & (df["Explainer"] == explainer_name)
-                ]
+            ]
             if aggregate:
                 sub_df = sub_df.groupby(x_axis).agg(aggregate_type).reset_index()
             x_values = sub_df.loc[:, x_axis].values
@@ -117,18 +118,19 @@ def dataframe_line_plot(
 
 
 def compute_pehe(
-        cate_true: np.ndarray,
-        cate_pred: torch.Tensor,
+    cate_true: np.ndarray,
+    cate_pred: torch.Tensor,
 ) -> tuple:
     pehe = np.sqrt(mean_squared_error(cate_true, cate_pred.detach().cpu().numpy()))
     return pehe
 
+
 def compute_cate_metrics(
-        cate_true: np.ndarray,
-        y_true: np.ndarray,
-        w_true: np.ndarray,
-        mu0_pred: torch.Tensor,
-        mu1_pred: torch.Tensor,
+    cate_true: np.ndarray,
+    y_true: np.ndarray,
+    w_true: np.ndarray,
+    mu0_pred: torch.Tensor,
+    mu1_pred: torch.Tensor,
 ) -> tuple:
     mu0_pred = mu0_pred.detach().cpu().numpy()
     mu1_pred = mu1_pred.detach().cpu().numpy()
@@ -137,11 +139,11 @@ def compute_cate_metrics(
 
     pehe = np.sqrt(mean_squared_error(cate_true, cate_pred))
 
-    y_pred = w_true.reshape(len(cate_true), ) * mu1_pred.reshape(len(cate_true), ) + (
-            1
-            - w_true.reshape(
-        len(cate_true),
-    )
+    y_pred = w_true.reshape(len(cate_true),) * mu1_pred.reshape(len(cate_true),) + (
+        1
+        - w_true.reshape(
+            len(cate_true),
+        )
     ) * mu0_pred.reshape(
         len(cate_true),
     )
@@ -156,21 +158,26 @@ def compute_cate_metrics(
     return pehe, factual_rmse
 
 
-def attribution_accuracy(target_features: list, feature_attributions: np.ndarray) -> float:
+def attribution_accuracy(
+    target_features: list, feature_attributions: np.ndarray
+) -> float:
     """
- Computes the fraction of the most important features that are truly important
- Args:
-     target_features: list of truly important feature indices
-     feature_attributions: feature attribution outputted by a feature importance method
+    Computes the fraction of the most important features that are truly important
+    Args:
+        target_features: list of truly important feature indices
+        feature_attributions: feature attribution outputted by a feature importance method
 
- Returns:
-     Fraction of the most important features that are truly important
+    Returns:
+        Fraction of the most important features that are truly important
     """
 
     n_important = len(target_features)  # Number of features that are important
-    largest_attribution_idx = torch.topk(torch.from_numpy(feature_attributions), n_important)[1] # Features with largest attribution
+    largest_attribution_idx = torch.topk(
+        torch.from_numpy(feature_attributions), n_important
+    )[
+        1
+    ]  # Features with largest attribution
     accuracy = 0  # Attribution accuracy
     for k in range(len(largest_attribution_idx)):
         accuracy += len(np.intersect1d(largest_attribution_idx[k], target_features))
-    return accuracy / (len(feature_attributions)*n_important)
-
+    return accuracy / (len(feature_attributions) * n_important)

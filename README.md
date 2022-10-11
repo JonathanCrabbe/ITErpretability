@@ -1,4 +1,6 @@
 # ITErpretability
+
+
 Code Authors: Ioana Bica (ioana.bica@eng.ox.ac.uk),  Alicia Curth (amc253@damtp.cam.ac.uk), Jonathan Crabbé (jc2133@cam.ac.uk)
 
 This repository contains the implementation of ITErpretability, a framework to bemchmark treatment effect neural network estimators with the help of interpretability. For more details, please read our [NeurIPS 2022 paper](https://arxiv.org/abs/2206.08363): 'Benchmarking Heterogeneous Treatment Effect Models through the Lens of Interpretability'.
