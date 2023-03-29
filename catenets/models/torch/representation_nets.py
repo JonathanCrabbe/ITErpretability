@@ -386,7 +386,6 @@ class TARNet(BasicDragonNet):
 
         return po_preds, prop_preds, self._maximum_mean_discrepancy(repr_preds, w)
 
-
 class DragonNet(BasicDragonNet):
     """
     Class implements a variant based on Shi et al (2019)'s DragonNet.
@@ -442,3 +441,116 @@ class DragonNet(BasicDragonNet):
         prop_preds = self._propensity_estimator(repr_preds)
 
         return po_preds, prop_preds, self._maximum_mean_discrepancy(repr_preds, w)
+
+class CENet(BasicDragonNet):
+
+    def __init__(
+        self,
+        n_unit_in: int,
+        binary_y: bool = False,
+        n_units_out_prop: int = DEFAULT_UNITS_OUT,
+        n_layers_out_prop: int = 0,
+        nonlin: str = DEFAULT_NONLIN,
+        penalty_disc: float = DEFAULT_PENALTY_DISC,
+        batch_norm: bool = True,
+        dropout: bool = False,
+        dropout_prob: float = 0.2,
+        **kwargs: Any,
+    ) -> None:
+        propensity_estimator = PropensityNet(
+            "tarnet_propensity_estimator",
+            n_unit_in,
+            2,
+            "prop",
+            n_layers_out_prop=n_layers_out_prop,
+            n_units_out_prop=n_units_out_prop,
+            nonlin=nonlin,
+            batch_norm=batch_norm,
+            dropout_prob=dropout_prob,
+            dropout=dropout,
+
+        ).to(DEVICE)
+        super(CENet, self).__init__(
+            "TARNet",
+            n_unit_in,
+            propensity_estimator,
+            binary_y=binary_y,
+            nonlin=nonlin,
+            penalty_disc=penalty_disc,
+            batch_norm=batch_norm,
+            dropout=dropout,
+            dropout_prob=dropout_prob,
+            **kwargs,
+        )
+        self.prop_loss_multiplier = 1
+
+    def _step(
+        self, X: torch.Tensor, w: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        repr_preds = self._repr_estimator(X).squeeze()
+
+        y0_preds = self._po_estimators[0](repr_preds).squeeze()
+        y1_preds = self._po_estimators[1](repr_preds).squeeze()
+
+        po_preds = torch.vstack((y0_preds, y1_preds)).T
+
+        prop_preds = self._propensity_estimator(X)
+
+        return po_preds, prop_preds, self._maximum_mean_discrepancy(repr_preds, w)
+
+class IPWNet(BasicDragonNet):
+
+    def __init__(
+        self,
+        n_unit_in: int,
+        binary_y: bool = False,
+        n_units_out_prop: int = DEFAULT_UNITS_OUT,
+        n_layers_out_prop: int = 0,
+        nonlin: str = DEFAULT_NONLIN,
+        penalty_disc: float = DEFAULT_PENALTY_DISC,
+        batch_norm: bool = True,
+        dropout: bool = False,
+        dropout_prob: float = 0.2,
+        **kwargs: Any,
+    ) -> None:
+        propensity_estimator = PropensityNet(
+            "tarnet_propensity_estimator",
+            n_unit_in,
+            2,
+            "prop",
+            n_layers_out_prop=n_layers_out_prop,
+            n_units_out_prop=n_units_out_prop,
+            nonlin=nonlin,
+            batch_norm=batch_norm,
+            dropout_prob=dropout_prob,
+            dropout=dropout
+        ).to(DEVICE)
+        super(IPWNet, self).__init__(
+            "TARNet",
+            n_unit_in,
+            propensity_estimator,
+            binary_y=binary_y,
+            nonlin=nonlin,
+            penalty_disc=penalty_disc,
+            batch_norm=batch_norm,
+            dropout=dropout,
+            dropout_prob=dropout_prob,
+            **kwargs,
+        )
+        self.prop_loss_multiplier = 1
+
+    def _step(
+        self, X: torch.Tensor, w: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        repr_preds = self._repr_estimator(X).squeeze()
+
+        y0_preds = self._po_estimators[0](repr_preds).squeeze()
+        y1_preds = self._po_estimators[1](repr_preds).squeeze()
+
+        po_preds = torch.vstack((y0_preds, y1_preds)).T
+
+        prop_preds = self._propensity_estimator(X)
+
+        mask = torch.vstack((torch.ones(po_preds.shape[0]), torch.zeros(po_preds.shape[0]))).T.to(prop_preds.device)
+
+        return po_preds / (mask - prop_preds), prop_preds, self._maximum_mean_discrepancy(repr_preds, w)

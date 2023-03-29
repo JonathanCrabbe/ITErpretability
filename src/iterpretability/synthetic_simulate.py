@@ -189,13 +189,14 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         self,
         X: np.ndarray,
         num_important_features: int = 10,
-        random_feature_selection: bool = True,
+        random_feature_selection: bool = False,
         seed: int = 42,
+        shift: int = 0
     ) -> None:
         super(SyntheticSimulatorLinear, self).__init__(seed=seed)
 
         self.prog_mask, self.pred0_mask, self.pred1_mask = self.get_important_features(
-            X, num_important_features, random_feature_selection
+            X, num_important_features, random_feature_selection, shift
         )
         self.prog_weights = np.random.uniform(-1, 1, size=(X.shape[1])) * self.prog_mask
         self.pred0_weights = (
@@ -209,9 +210,9 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         self,
         X: np.ndarray,
         num_important_features: int,
-        random_feature_selection: bool = True,
+        random_feature_selection: bool = False,
+        shift: int = 0
     ) -> Tuple:
-        assert num_important_features <= int(X.shape[1] / 3)
         prog_mask = np.zeros(shape=(X.shape[1]))
         pred0_mask = np.zeros(shape=(X.shape[1]))
         pred1_mask = np.zeros(shape=(X.shape[1]))
@@ -227,6 +228,9 @@ class SyntheticSimulatorLinear(SyntheticSimulatorBase):
         pred1_indices = all_indices[
             (2 * num_important_features) : (3 * num_important_features)
         ]
+
+        if shift != 0:
+            prog_indices[:shift] = all_indices[-shift:]
 
         prog_mask[prog_indices] = 1
         pred0_mask[pred0_indices] = 1
