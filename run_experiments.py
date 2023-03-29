@@ -48,39 +48,7 @@ def init_arg() -> Any:
     parser.add_argument("--predictive_scale", default=1.0, type=float)
     parser.add_argument(
         "--seed_list",
-        nargs="+",
-        default=[
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-            24,
-            25,
-            26,
-            27,
-            28,
-            29,
-            30,
-        ],
+        default=30,
         type=int,
     )
     parser.add_argument(
@@ -103,7 +71,7 @@ def init_arg() -> Any:
 if __name__ == "__main__":
     log.add(sink=sys.stderr, level="INFO")
     args = init_arg()
-    for seed in args.seed_list:
+    for seed in range(1, args.seed_list):
         log.info(
             f"Experiment {args.experiment_name} with simulator {args.synthetic_simulator_type}, explainer limit {args.explainer_limit} and seed {seed}."
         )
@@ -178,3 +146,4 @@ if __name__ == "__main__":
 
         else:
             raise ValueError("The experiment name is invalid.")
+
